@@ -26,7 +26,8 @@ pub mod graphics;
 pub mod inputs;
 mod pipeline;
 mod resources;
-mod scene;
+pub mod scene;
+pub mod action;
 
 /// Adds two numbers.
 ///

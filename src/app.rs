@@ -5,6 +5,7 @@ use crate::{
     inputs,
     scene::{self, Scene},
 };
+use crate::action::Action;
 use winit::application::ApplicationHandler;
 use winit::{event::WindowEvent, event_loop};
 
@@ -15,7 +16,7 @@ pub struct App {
     /// Contains the screen instance which will be used to draw on the window.
     screen: graphics::screen::Screen,
     /// Allows us to handle the user inputs.
-    input_state: inputs::InputState,
+    input_state: inputs::InputHandler,
     /// Contains everything needed to render the environment.
     scene: scene::Scene,
 }
@@ -34,9 +35,12 @@ impl App {
     /// The instantiated App.
     pub fn new(width: u32, height: u32) -> Self {
         let window = Window::new(width, height);
-        let input_state = inputs::InputState::new();
+        let input_state = inputs::InputHandler::new();
         let screen = Screen::new(width, height);
-        let scene = Scene {};
+        let scene = {
+            let camera = scene::camera::Camera::default();
+            Scene { camera }
+        };
         App {
             window,
             screen,
@@ -44,6 +48,15 @@ impl App {
             scene,
         }
     }
+    /// Acts on actions.
+    ///
+    /// Given a list of actions from the InputHandler, execute the required code for each.
+    /// These actions will include mouse movements too, whose magnitude will need to be queried.
+    ///
+    /// # Arguments
+    ///
+    /// * `action` - List of actions to act upon.
+    fn handle_actions(&mut self, actions: Vec<Action>) {}
 }
 
 impl ApplicationHandler for App {
@@ -79,6 +92,17 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 println!("Redrawing requested.");
+                let pixels = self.screen.pixels.as_mut().unwrap();
+                let mut pixel_index: u32;
+                let frame = pixels.frame_mut();
+                for i in 0..20000 {
+                    pixel_index = i * 4;
+                    frame[pixel_index as usize] = 255;
+                    frame[pixel_index as usize + 1] = 255;
+                    frame[pixel_index as usize + 2] = 255;
+                    frame[pixel_index as usize + 3] = 255;
+                }
+                pixels.render().unwrap();
                 // Redraws the screen.
                 self.window
                     .winit_window
