@@ -1,6 +1,7 @@
 //! Container for anything action related. These actions are used to act on the scene.
 
 /// Conatins a list of possible actions.
+#[derive(Clone)]
 pub enum Action {
     /// Makes the camera move forward.
     MoveForwards,

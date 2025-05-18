@@ -1,12 +1,13 @@
 //! Exposes the API that will be used to create an interactable window that can be drawn on.
 
+use crate::action::Action;
 use crate::{
     graphics::{self, screen::Screen, window::Window},
     inputs,
     scene::{self, Scene},
 };
-use crate::action::Action;
 use winit::application::ApplicationHandler;
+use winit::event::ElementState;
 use winit::{event::WindowEvent, event_loop};
 
 /// Contains the window, screen that is within the window and the input manager.
@@ -52,11 +53,9 @@ impl App {
     ///
     /// Given a list of actions from the InputHandler, execute the required code for each.
     /// These actions will include mouse movements too, whose magnitude will need to be queried.
-    ///
-    /// # Arguments
-    ///
-    /// * `action` - List of actions to act upon.
-    fn handle_actions(&mut self, actions: Vec<Action>) {}
+    fn handle_actions(&mut self) {
+        let actions = self.input_state.collect_actions();
+    }
 }
 
 impl ApplicationHandler for App {
@@ -82,7 +81,7 @@ impl ApplicationHandler for App {
     fn window_event(
         &mut self,
         event_loop: &event_loop::ActiveEventLoop,
-        window_id: winit::window::WindowId,
+        _window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
         match event {
@@ -91,7 +90,7 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                println!("Redrawing requested.");
+                // println!("Redrawing requested.");
                 let pixels = self.screen.pixels.as_mut().unwrap();
                 let mut pixel_index: u32;
                 let frame = pixels.frame_mut();
@@ -103,14 +102,30 @@ impl ApplicationHandler for App {
                     frame[pixel_index as usize + 3] = 255;
                 }
                 pixels.render().unwrap();
-                // Redraws the screen.
-                self.window
-                    .winit_window
-                    .as_ref()
-                    .expect("Window should be initialized")
-                    .request_redraw();
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                let key_state = event.state;
+                let winit::keyboard::PhysicalKey::Code(key_code) = event.physical_key else {
+                    return;
+                };
+                // Give the input state of the key to the input handler.
+                match key_state {
+                    ElementState::Pressed => self.input_state.press_key(key_code),
+                    ElementState::Released => self.input_state.release_key(key_code),
+                }
             }
             _ => {}
         }
+    }
+    fn about_to_wait(&mut self, event_loop: &event_loop::ActiveEventLoop) {
+        // Handle actions.
+        self.handle_actions();
+        // Renders the screen into the pixel buffer.
+        // Redraws the screen.
+        self.window
+            .winit_window
+            .as_ref()
+            .expect("Window should be initialized")
+            .request_redraw();
     }
 }
