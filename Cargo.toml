@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-glam = "0.30.3"     # Math library for 2-3-4D vectors, matrices.
+glam = {version = "0.30.3", features = ["glam-assert"]}     # Math library for 2-3-4D vectors, matrices.
 ndarray = "0.16.1"  # For working with n-dimensional arrays (probably won't use it).
 winit = "0.30.10"   # To manage windows, keyboard and mouse.
 pixels = "0.15.0"   # To draw pixels on the screen.

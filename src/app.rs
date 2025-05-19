@@ -6,8 +6,9 @@ use crate::{
     inputs,
     scene::{self, Scene},
 };
+use glam::DVec3;
 use winit::application::ApplicationHandler;
-use winit::event::ElementState;
+use winit::event::{DeviceEvent, ElementState};
 use winit::{event::WindowEvent, event_loop};
 
 /// Contains the window, screen that is within the window and the input manager.
@@ -55,6 +56,31 @@ impl App {
     /// These actions will include mouse movements too, whose magnitude will need to be queried.
     fn handle_actions(&mut self) {
         let actions = self.input_state.collect_actions();
+        for action in actions.iter() {
+            match action {
+                Action::MoveForwards => {
+                    self.scene.camera.add_position(&DVec3::Y);
+                }
+                Action::MoveBackwards => {
+                    self.scene.camera.add_position(&-DVec3::Y);
+                }
+                Action::MoveLeft => {
+                    self.scene.camera.add_position(&-DVec3::X);
+                }
+                Action::MoveRight => {
+                    self.scene.camera.add_position(&DVec3::X);
+                }
+                Action::MoveUp => {
+                    println!("Up");
+                }
+                Action::MoveDown => {
+                    println!("Down");
+                }
+                Action::RotateCamera { pitch, yaw } => {
+                    println!("Rotate, pitch: {}, yaw: {}", pitch, yaw);
+                }
+            }
+        }
     }
 }
 
@@ -76,6 +102,13 @@ impl ApplicationHandler for App {
             eprintln!("Failed to initialize screen: {e}");
             std::process::exit(1);
         }
+        // TODO: Use something similar to capture the mouse.
+        // self.window
+        //     .winit_window
+        //     .as_mut()
+        //     .unwrap()
+        //     .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+        //     .unwrap();
     }
 
     fn window_event(
@@ -92,15 +125,21 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 // println!("Redrawing requested.");
                 let pixels = self.screen.pixels.as_mut().unwrap();
-                let mut pixel_index: u32;
+                let pixel_index: u32;
                 let frame = pixels.frame_mut();
-                for i in 0..20000 {
-                    pixel_index = i * 4;
-                    frame[pixel_index as usize] = 255;
-                    frame[pixel_index as usize + 1] = 255;
-                    frame[pixel_index as usize + 2] = 255;
-                    frame[pixel_index as usize + 3] = 255;
-                }
+                let camera_pos = self.scene.camera.get_position();
+                pixel_index = (camera_pos.x*4.0 - self.window.width as f64 * 4.0 * camera_pos.y) as u32;
+                frame[pixel_index as usize] = 255;
+                frame[pixel_index as usize + 1] = 0;
+                frame[pixel_index as usize + 2] = 255;
+                frame[pixel_index as usize + 3] = 255;
+                // for i in 0..20000 {
+                //     pixel_index = i * 4;
+                //     frame[pixel_index as usize] = 255;
+                //     frame[pixel_index as usize + 1] = 255;
+                //     frame[pixel_index as usize + 2] = 255;
+                //     frame[pixel_index as usize + 3] = 255;
+                // }
                 pixels.render().unwrap();
             }
             WindowEvent::KeyboardInput { event, .. } => {
@@ -113,6 +152,19 @@ impl ApplicationHandler for App {
                     ElementState::Pressed => self.input_state.press_key(key_code),
                     ElementState::Released => self.input_state.release_key(key_code),
                 }
+            }
+            _ => {}
+        }
+    }
+    fn device_event(
+        &mut self,
+        _event_loop: &event_loop::ActiveEventLoop,
+        _device_id: winit::event::DeviceId,
+        event: winit::event::DeviceEvent,
+    ) {
+        match event {
+            DeviceEvent::MouseMotion { delta } => {
+                println!("Delta mouse: {:?}", delta);
             }
             _ => {}
         }

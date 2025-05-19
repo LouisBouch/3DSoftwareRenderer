@@ -1,5 +1,6 @@
 //! Handles the input from the user.
 use crate::action::Action;
+use core::time;
 use std::collections::HashMap;
 use winit::{self, keyboard::KeyCode};
 
@@ -27,6 +28,7 @@ pub struct InputHandler {
     /// List of action for each key when it is released.
     released_action: HashMap<KeyCode, Action>,
     // TODO: Include mouse events
+    // sensitivity: f32,
     // last_mouse_pos: (f64, f64),
     // mouse_button_states: HashMap<KeyCode, InputState>,
     // 3 more hashmaps
@@ -35,12 +37,14 @@ impl InputHandler {
     /// Creates a new input state, which will store the actions of keypresses
     /// and their state (held or not).
     pub fn new() -> InputHandler {
-        InputHandler {
+        let mut input_handler = InputHandler {
             key_states: HashMap::new(),
             pressed_action: HashMap::new(),
             held_action: HashMap::new(),
             released_action: HashMap::new(),
-        }
+        };
+        input_handler.setup_default_bindings();
+        input_handler
     }
     /// Binds a key.
     ///
@@ -144,6 +148,7 @@ impl InputHandler {
         if !self.key_states.contains_key(&key_code) {
             self.key_states.insert(key_code, InputState::Pressed);
             println!("key {:?} was pressed", key_code);
+            // std::thread::sleep(time::Duration::from_millis(500));
         }
     }
     /// Updates key to released state.
@@ -172,5 +177,13 @@ impl InputHandler {
     /// Creates the default bindings.
     ///
     /// Default bindings include movement bindings, speed increases, etc.
-    fn setup_default_bindings(&mut self) {}
+    fn setup_default_bindings(&mut self) {
+        // Setup basic movement bindings.
+        self.held_action.insert(KeyCode::KeyW, Action::MoveForwards);
+        self.held_action.insert(KeyCode::KeyA, Action::MoveLeft);
+        self.held_action.insert(KeyCode::KeyS, Action::MoveBackwards);
+        self.held_action.insert(KeyCode::KeyD, Action::MoveRight);
+        self.held_action.insert(KeyCode::Space, Action::MoveUp);
+        self.held_action.insert(KeyCode::ControlLeft, Action::MoveDown);
+    }
 }
