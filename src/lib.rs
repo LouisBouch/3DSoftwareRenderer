@@ -24,8 +24,8 @@
 pub mod app;
 pub mod graphics;
 pub mod inputs;
-mod pipeline;
-mod resources;
+pub mod pipeline;
+pub mod resources;
 pub mod scene;
 pub mod action;
 

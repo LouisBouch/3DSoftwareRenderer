@@ -7,7 +7,5 @@ pub struct Scene {
     /// The camera from which the environment will be seen.
     pub camera: Camera,
 }
-mod vertex;
-mod mesh;
 mod light;
 pub mod camera;
