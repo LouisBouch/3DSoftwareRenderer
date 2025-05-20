@@ -1,6 +1,7 @@
 //! Handles the input from the user.
 use crate::action::Action;
 use core::time;
+use glam::DVec2;
 use std::collections::HashMap;
 use winit::{self, keyboard::KeyCode};
 
@@ -28,8 +29,11 @@ pub struct InputHandler {
     /// List of action for each key when it is released.
     released_action: HashMap<KeyCode, Action>,
     // TODO: Include mouse events
-    // sensitivity: f32,
-    // last_mouse_pos: (f64, f64),
+    /// Converts hardware mouse changes into camera rotation.
+    sensitivity: f32,
+    /// Change in mouse position since last time the inputs were checked.
+    /// None if no changes.
+    mouse_delta: Option<DVec2>,
     // mouse_button_states: HashMap<KeyCode, InputState>,
     // 3 more hashmaps
 }
@@ -42,6 +46,8 @@ impl InputHandler {
             pressed_action: HashMap::new(),
             held_action: HashMap::new(),
             released_action: HashMap::new(),
+            sensitivity: 1.0,
+            mouse_delta: None,
         };
         input_handler.setup_default_bindings();
         input_handler
@@ -131,6 +137,15 @@ impl InputHandler {
                 }
             }
         }
+        // Collect mouse movements.
+        if let Some(DVec2 { x, y }) = self.mouse_delta.as_ref() {
+            actions.push(Action::RotateCamera {
+                yaw: -x * self.sensitivity as f64,
+                pitch: -y * self.sensitivity as f64,
+            });
+            // Now that the action was prepared, reset the delta.
+            self.mouse_delta = None;
+        }
         // Delete from the list the keys that were released.
         for key in key_to_delete.iter() {
             self.key_states.remove(key);
@@ -174,6 +189,24 @@ impl InputHandler {
         }
         println!("key {:?} was released", key_code);
     }
+    /// Updates the mouse delta when the mouse is moved.
+    ///
+    /// This method is called when the mouse is moved, which adds the hardware detected movement to
+    /// the total movement since the last input collection.
+    ///
+    /// # Arguments
+    ///
+    /// * `delta` - The raw mouse input detected by the hardware.
+    pub fn mouse_moved_raw(&mut self, new_delta: &DVec2) {
+        // Add the delta if there is a delta.
+        if let Some(current_delta) = self.mouse_delta.as_mut() {
+            *current_delta += new_delta;
+        }
+        // Otherwise set the total mouse delta to be the current delta.
+        else {
+            self.mouse_delta = Some(*new_delta);
+        }
+    }
     /// Creates the default bindings.
     ///
     /// Default bindings include movement bindings, speed increases, etc.
@@ -181,9 +214,11 @@ impl InputHandler {
         // Setup basic movement bindings.
         self.held_action.insert(KeyCode::KeyW, Action::MoveForwards);
         self.held_action.insert(KeyCode::KeyA, Action::MoveLeft);
-        self.held_action.insert(KeyCode::KeyS, Action::MoveBackwards);
+        self.held_action
+            .insert(KeyCode::KeyS, Action::MoveBackwards);
         self.held_action.insert(KeyCode::KeyD, Action::MoveRight);
         self.held_action.insert(KeyCode::Space, Action::MoveUp);
-        self.held_action.insert(KeyCode::ControlLeft, Action::MoveDown);
+        self.held_action
+            .insert(KeyCode::ControlLeft, Action::MoveDown);
     }
 }

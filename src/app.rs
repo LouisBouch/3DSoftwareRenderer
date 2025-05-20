@@ -6,7 +6,7 @@ use crate::{
     inputs,
     scene::{self, Scene},
 };
-use glam::DVec3;
+use glam::{DVec2, DVec3};
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, ElementState};
 use winit::{event::WindowEvent, event_loop};
@@ -128,7 +128,8 @@ impl ApplicationHandler for App {
                 let pixel_index: u32;
                 let frame = pixels.frame_mut();
                 let camera_pos = self.scene.camera.get_position();
-                pixel_index = (camera_pos.x*4.0 - self.window.width as f64 * 4.0 * camera_pos.y) as u32;
+                pixel_index =
+                    (camera_pos.x * 4.0 - self.window.width as f64 * 4.0 * camera_pos.y) as u32;
                 frame[pixel_index as usize] = 255;
                 frame[pixel_index as usize + 1] = 0;
                 frame[pixel_index as usize + 2] = 255;
@@ -164,7 +165,8 @@ impl ApplicationHandler for App {
     ) {
         match event {
             DeviceEvent::MouseMotion { delta } => {
-                println!("Delta mouse: {:?}", delta);
+                self.input_state
+                    .mouse_moved_raw(&DVec2::new(delta.0, delta.1));
             }
             _ => {}
         }
