@@ -1,5 +1,8 @@
 /target
 
+# But allow access to the local documentation.
+!target/doc/soft_rend/index.html
+
 
 # Added by cargo
 #
