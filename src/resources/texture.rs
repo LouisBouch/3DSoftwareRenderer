@@ -75,7 +75,7 @@ impl Texture {
         if width * height * format_channels != pixels.len() as u32 {
             return Err(TextureError::MismatchedPixelDataSize {
                 expected: width * height * format_channels,
-                got: pixels.len() as u32,
+                actual: pixels.len() as u32,
             });
         }
         Ok(Texture {
@@ -98,13 +98,17 @@ pub enum Format {
 pub enum TextureError {
     /// Used when creating a texture from a list of pixels and the width, height and format given
     /// are incompatible with the pixel data received.
-    MismatchedPixelDataSize { expected: u32, got: u32 },
+    MismatchedPixelDataSize {
+        /// Expected length of the pixels vector.
+        expected: u32,
+        /// Actual length of the pixels array.
+        actual: u32 },
 }
 
 impl fmt::Display for TextureError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TextureError::MismatchedPixelDataSize { expected, got } => {
+            TextureError::MismatchedPixelDataSize { expected, actual: got } => {
                 write!(f, "Pixel data incompatible with given width, height and format. Expected {}, got {}", expected, got)
             }
         }
