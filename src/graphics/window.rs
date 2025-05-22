@@ -9,11 +9,11 @@ use winit::window;
 /// Contains the necessary information to move and create a window.
 pub struct Window {
     /// Width of the window.
-    pub width: u32,
+    width: u32,
     /// Height of the window.
-    pub height: u32,
+    height: u32,
     /// Shared instance of the winit window.
-    pub winit_window: Option<Arc<window::Window>>,
+    winit_window: Option<Arc<window::Window>>,
 }
 
 impl Window {
@@ -59,5 +59,17 @@ impl Window {
         let winit_window = event_loop.create_window(attributes)?;
         self.winit_window = Some(Arc::new(winit_window));
         Ok(())
+    }
+    /// Getter for the width.
+    pub fn width(&self) -> u32{
+        self.width
+    }
+    /// getter for the height.
+    pub fn height(&self) -> u32{
+        self.height
+    }
+    /// Mutable getter for the winit window.
+    pub fn winit_window_mut(&self) -> Option<&Arc<window::Window>> {
+        self.winit_window.as_ref()
     }
 }

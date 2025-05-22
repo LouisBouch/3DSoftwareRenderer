@@ -4,20 +4,76 @@ use std::collections::HashMap;
 
 /// Owns the textures as well as the necessary maps to efficiently access them.
 pub struct TextureCatalog {
+    /// Id to give to the next texture added. Start at 1, and use 0 for issues.
+    next_id: u32,
     /// Map containing the id of each texture.
     textures: HashMap<u32, Texture>,
     /// Given a texture name (file name), obtain the id of the texture.
     texture_ids: HashMap<String, u32>,
 }
+impl TextureCatalog {
+    /// Creates a default texture catalog with no textures.
+    pub fn new() -> Self {
+        TextureCatalog {
+            next_id: 1,
+            textures: HashMap::new(),
+            texture_ids: HashMap::new(),
+        }
+    }
+    /// Add a teture to the catalog.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the texture.
+    /// * `texture` - The texture to add to the catalog.
+    ///
+    /// # Return
+    ///
+    /// The id of the texture that was added to the catalog if succesful.
+    pub fn add_texture(&mut self, name: String, texture: Texture) -> Result<u32, TextureError> {
+        if let Some(&id) = self.texture_ids.get(&name) {
+            return Err(TextureError::TextureNameAlreadyExists { name: name, id: id });
+        }
+        self.texture_ids.insert(name, self.next_id);
+        self.textures.insert(self.next_id, texture);
+        self.next_id += 1;
+        Ok(self.next_id - 1)
+    }
+    /// Get the texture from its id
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Id of the texture.
+    ///
+    /// # Return
+    ///
+    /// A reference to the texture associated with the `id`. None otherwise.
+    pub fn texture_from_id(&self, id: u32) -> Option<&Texture> {
+        self.textures.get(&id)
+    }
+    /// Get the id of a texture given its name.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Name of the texture.
+    ///
+    /// # Return
+    ///
+    /// The id associated with the `name`, if it exists. None otherwise.
+    pub fn id_from_name(&self, name: &str) -> Option<u32> {
+        self.texture_ids.get(name).copied()
+    }
+}
 /// The texture defined as a 2D image of pixels.
 pub struct Texture {
-    pixels: Vec<u8>,
+    /// The RGB/A pixel values for every pixels. Left to right, top to bottom.
+    pub pixels: Vec<u8>,
     /// Number of pixels horizontally.
-    width: u32,
+    pub width: u32,
     /// Number of pixels vertically.
-    height: u32,
+    pub height: u32,
     /// Pixel format of the texture.
-    format: Format,
+    pub format: Format,
 }
 impl Texture {
     /// Create a new invisible texture instance.
@@ -102,14 +158,32 @@ pub enum TextureError {
         /// Expected length of the pixels vector.
         expected: u32,
         /// Actual length of the pixels array.
-        actual: u32 },
+        actual: u32,
+    },
+    /// Used when the user tries to add a texture that already exists in the catalog.
+    TextureNameAlreadyExists {
+        /// Name of the texture.
+        name: String,
+        /// Id of the existing texture.
+        id: u32,
+    },
 }
 
 impl fmt::Display for TextureError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TextureError::MismatchedPixelDataSize { expected, actual: got } => {
+            TextureError::MismatchedPixelDataSize {
+                expected,
+                actual: got,
+            } => {
                 write!(f, "Pixel data incompatible with given width, height and format. Expected {}, got {}", expected, got)
+            }
+            TextureError::TextureNameAlreadyExists { name, id } => {
+                write!(
+                    f,
+                    "The texture with name '{}' already exists with id '{}'.",
+                    name, id
+                )
             }
         }
     }

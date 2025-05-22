@@ -28,40 +28,14 @@ pub mod resources;
 pub mod scene;
 pub mod action;
 
-/// Adds two numbers.
-///
-/// Given `left` and `right`, return their sum.
-///
-/// # Arguments
-///
-/// * `left` - First number to add
-/// * `right` - Second number to add
-///
-/// # Returns
-///
-/// The sum of `left` and `right`.
-///
-/// # Panics
-///
-/// This function does not panic.
-///
-/// # Examples
-///
-/// ```
-/// let result = add(1,2);
-/// assert_eq!(result, 3);
-/// ```
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
-
+// Default tests
 #[cfg(test)]
 mod tests {
-    use super::*;
+    //use super::*;
 
     #[test]
     fn it_works() {
-        let result = add(2, 2);
+        let result = 2+2;
         assert_eq!(result, 4);
     }
 }

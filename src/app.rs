@@ -31,24 +31,37 @@ impl App {
     ///
     /// * `width` - Width of the window.
     /// * `height` - Height of the window.
+    /// * `scene` - The scene that will be rendered.
     ///
     /// # Returns
     ///
     /// The instantiated App.
-    pub fn new(width: u32, height: u32) -> Self {
+    pub fn new(width: u32, height: u32, scene: Scene) -> Self {
         let window = Window::new(width, height);
         let input_state = inputs::InputHandler::new();
         let screen = Screen::new(width, height);
-        let scene = {
-            let camera = scene::camera::Camera::default();
-            Scene { camera }
-        };
         App {
             window,
             screen,
             input_state,
             scene,
         }
+    }
+    /// Creates an app.
+    ///
+    /// Prepares the necessary fields before running the event loop and uses a default scene.
+    ///
+    /// # Arguments
+    ///
+    /// * `width` - Width of the window.
+    /// * `height` - Height of the window.
+    ///
+    /// # Returns
+    ///
+    /// The instantiated App.
+    pub fn with_default_scene(width: u32, height: u32) -> Self {
+        let scene = Scene::new();
+        Self::new(width, height, scene)
     }
     /// Acts on actions.
     ///
@@ -59,16 +72,16 @@ impl App {
         for action in actions.iter() {
             match action {
                 Action::MoveForwards => {
-                    self.scene.camera.add_position(&DVec3::Y);
+                    self.scene.camera_mut().add_position(&DVec3::Y);
                 }
                 Action::MoveBackwards => {
-                    self.scene.camera.add_position(&-DVec3::Y);
+                    self.scene.camera_mut().add_position(&-DVec3::Y);
                 }
                 Action::MoveLeft => {
-                    self.scene.camera.add_position(&-DVec3::X);
+                    self.scene.camera_mut().add_position(&-DVec3::X);
                 }
                 Action::MoveRight => {
-                    self.scene.camera.add_position(&DVec3::X);
+                    self.scene.camera_mut().add_position(&DVec3::X);
                 }
                 Action::MoveUp => {
                     println!("Up");
@@ -95,9 +108,9 @@ impl ApplicationHandler for App {
         // Initialize the pixels instance inside the screen.
         let winit_window_shared = self
             .window
-            .winit_window
-            .clone()
-            .expect("The window should be instantiated");
+            .winit_window_mut()
+            .expect("The window should be instantiated")
+            .clone();
         if let Err(e) = self.screen.initialize_pixels(winit_window_shared) {
             eprintln!("Failed to initialize screen: {e}");
             std::process::exit(1);
@@ -124,12 +137,12 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 // println!("Redrawing requested.");
-                let pixels = self.screen.pixels.as_mut().unwrap();
+                let pixels = self.screen.pixels_mut().unwrap();
                 let pixel_index: u32;
                 let frame = pixels.frame_mut();
-                let camera_pos = self.scene.camera.get_position();
+                let camera_pos = self.scene.camera_mut().position();
                 pixel_index =
-                    (camera_pos.x * 4.0 - self.window.width as f64 * 4.0 * camera_pos.y) as u32;
+                    (camera_pos.x * 4.0 - self.window.width() as f64 * 4.0 * camera_pos.y) as u32;
                 frame[pixel_index as usize] = 255;
                 frame[pixel_index as usize + 1] = 0;
                 frame[pixel_index as usize + 2] = 255;
@@ -177,8 +190,7 @@ impl ApplicationHandler for App {
         // Renders the screen into the pixel buffer.
         // Redraws the screen.
         self.window
-            .winit_window
-            .as_ref()
+            .winit_window_mut()
             .expect("Window should be initialized")
             .request_redraw();
     }

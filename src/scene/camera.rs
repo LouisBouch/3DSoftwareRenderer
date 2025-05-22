@@ -55,7 +55,7 @@ impl Camera {
     /// # Returns
     ///
     /// Reference to the position of the camera.
-    pub fn get_position(&self) -> &DVec3 {
+    pub fn position(&self) -> &DVec3 {
         &self.position
     }
     /// Adds a vector to the camera position.

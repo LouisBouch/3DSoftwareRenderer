@@ -1,17 +1,17 @@
 //! Handles actions related to screen drawing.
 use std::sync::Arc;
 
-use pixels::{self, SurfaceTexture};
+use pixels::{self, Pixels, SurfaceTexture};
 use winit;
 
 /// Contains the necessary information to draw pixels on the screen.
 pub struct Screen {
     /// Width of the buffer.
-    pub width: u32,
+    width: u32,
     /// Height of the buffer.
-    pub height: u32,
+    height: u32,
     /// Pixels instance used to draw on screen.
-    pub pixels: Option<pixels::Pixels<'static>>,
+    pixels: Option<pixels::Pixels<'static>>,
     /// Buffer containing pixel depths.
     depth_buffer: Vec<f32>,
 }
@@ -58,5 +58,9 @@ impl Screen {
         };
         self.pixels = Some(pixels);
         Ok(())
+    }
+    /// Mutable getter for the pixels instance.
+    pub fn pixels_mut(&mut self) -> Option<&mut Pixels<'static>> {
+        self.pixels.as_mut()
     }
 }
