@@ -64,16 +64,28 @@ impl TextureCatalog {
         self.texture_ids.get(name).copied()
     }
 }
+// Getters and setters.
+impl TextureCatalog {
+    /// Obtains a reference for the map of textures.
+    pub fn textures(&self) -> &HashMap<u32, Texture> {
+        &self.textures
+    }
+    /// Obtains a reference for the map of texture ids.
+    pub fn textures_ids(&self) -> &HashMap<String, u32> {
+        &self.texture_ids
+    }
+}
+////////////////////////////////////////////////////////////
 /// The texture defined as a 2D image of pixels.
 pub struct Texture {
     /// The RGB/A pixel values for every pixels. Left to right, top to bottom.
-    pub pixels: Vec<u8>,
+    pixels: Vec<u8>,
     /// Number of pixels horizontally.
-    pub width: u32,
+    width: u32,
     /// Number of pixels vertically.
-    pub height: u32,
+    height: u32,
     /// Pixel format of the texture.
-    pub format: Format,
+    format: Format,
 }
 impl Texture {
     /// Create a new invisible texture instance.
@@ -142,7 +154,27 @@ impl Texture {
         })
     }
 }
+// Getters and setters.
+impl Texture {
+    /// Obtains a reference to the list of pixel values.
+    pub fn pixels(&self) -> &Vec<u8> {
+        &self.pixels
+    }
+    /// Obtains the width of the texture.
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+    /// Obtains the height of the texture.
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+    /// Obtains the format of the texture.
+    pub fn format(&self) -> &Format {
+        &self.format
+    }
+}
 /// Format of the texture.
+#[derive(Copy, Clone)]
 pub enum Format {
     /// 8 bits for red, green, blue and alpha channels, respectively.
     RGBA32,

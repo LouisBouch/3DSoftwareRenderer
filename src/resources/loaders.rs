@@ -34,7 +34,6 @@ impl TextureLoader {
     pub fn load_default_texture(&self, texture: DefaultTexture) -> Texture {
         match texture {
             DefaultTexture::Checkered(size) => {
-                let format = Format::RGB24;
                 let format_nb_channels: usize = 3;
                 let mut pixels =
                     Vec::<u8>::with_capacity(size as usize * size as usize * format_nb_channels);
@@ -54,12 +53,10 @@ impl TextureLoader {
                     }
                 }
                 // Finally, create the texture.
-                Texture {
-                    pixels: pixels,
-                    width: 100,
-                    height: 100,
-                    format,
-                }
+                Texture::from_pixels(100, 100, &pixels, Format::RGB24).unwrap_or_else(|e| {
+                    eprintln!("Could not create texture: {e}");
+                    Texture::new(100, 100, Format::RGB24)
+                })
             }
         }
     }
@@ -78,7 +75,12 @@ impl TextureLoader {
     /// The loaded texture if succesful, or an io error when the file failed to open or give a
     /// valid texture.
     pub fn load_texture_from_file(&self, file_name: &str) -> Result<Texture, std::io::Error> {
-        !todo!("Implement texture loading from file");
+        println!("Loadgin texture from file: {}", file_name);
+        todo!("Implement texture loading from file");
+    }
+    /// Getter for the sampling of the loader.
+    pub fn sampling(&self) -> u32 {
+        self.sampling
     }
 }
 /// A list of default textures that can be used to quickly get a texture.
@@ -189,7 +191,12 @@ impl MeshLoader {
     /// The loaded mesh if succesful, or an io error when the file failed to open or give a
     /// valid object.
     pub fn load_mesh_from_file(&self, file_name: &str) -> Result<Mesh, std::io::Error> {
-        !todo!("Implement mesh loading from file");
+        println!("Loading mesh from file: {}", file_name);
+        todo!("Implement mesh loading from file");
+    }
+    /// Getter for the scale of the loader.
+    pub fn scale(&self) -> f32 {
+        self.scale
     }
 }
 /// A list of default patterns that can be used to quickly get a texture.

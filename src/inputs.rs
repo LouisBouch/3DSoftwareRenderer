@@ -1,6 +1,5 @@
 //! Handles the input from the user.
 use crate::action::Action;
-use core::time;
 use glam::DVec2;
 use std::collections::HashMap;
 use winit::{self, keyboard::KeyCode};
@@ -61,7 +60,7 @@ impl InputHandler {
     /// * `input_state` - State of the key event.
     /// * `key_code` - Code of the key being pressed.
     /// * `action` - Action.
-    fn bind(&mut self, input_state: InputState, key_code: KeyCode, action: Action) {
+    pub fn bind(&mut self, input_state: InputState, key_code: KeyCode, action: Action) {
         match input_state {
             InputState::Pressed => {
                 self.pressed_action.insert(key_code, action);

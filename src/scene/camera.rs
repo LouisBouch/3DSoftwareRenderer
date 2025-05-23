@@ -1,34 +1,29 @@
-//! Contains everything realted to the camera.
+//! Contains everything realted to the [`Camera`].
 
-use glam::{self, DMat3, DMat4, DQuat, DVec3};
+use glam::{DMat3, DMat4, DQuat, DVec3, DVec4};
 
-/// Contains the necessary information to define a camera.
+/// Contains the necessary information to define a [`Camera`].
 ///
-/// ## The camera implicitly uses the following for orientation
+/// ## The [`Camera`] implicitly uses the following for orientation (in camera space).
 /// - Forward: **-[`DVec3`]::Z**
 /// - Right: **[`DVec3`]::X**
 /// - Up: **[`DVec3`]::Y**
 pub struct Camera {
     /// Position of the camera in world space.
     position: DVec3,
-    /// Quaternion defining the orientation of the camera.
+    /// Quaternion defining the orientation of the [`Camera`].
     quat: DQuat,
-    /// Transform that moves and rotates the camera from the origin of the world to its position.
+    /// Transform that moves and rotates the [`Camera`] from the origin of the world to its position.
     /// Made from the position and quaternion.
     transform: DMat4,
-    /// Distance to the near clipping plane of the view frustum.
-    near_clip: f32,
-    /// Distance to the far clipping plane of the view frustum.
-    far_clip: f32,
-    /// Width divided by height of the view frustum.
-    aspect_ratio: f32,
-    /// Horizontal fov of the view frustum.
-    hfov: f32,
+    /// The type of projection the camera will use.
+    projection: Projection
 }
 impl Default for Camera {
-    /// Creates a default camera.
+    /// Creates a default [`Camera`].
     ///
-    /// ### Default values
+    /// # Default values
+    ///
     /// - `position`: **[`DVec3`]::ZERO**
     /// - `quat`: **[`DQuat`]::default()**
     /// - `transform`: **[`DMat4`]::default()**
@@ -37,19 +32,57 @@ impl Default for Camera {
     /// - `aspect_ratio`: **16.0/9.0**
     /// - `hfov`: **90.0**
     fn default() -> Self {
-        Camera {
-            position: DVec3::ZERO,
-            quat: DQuat::default(),
-            transform: DMat4::default(),
-            near_clip: 1.0,
-            far_clip: 10.0,
-            aspect_ratio: 16.0 / 9.0,
-            hfov: 90.0,
-        }
+        Camera::new_perspective(
+            &DVec3::ZERO,
+            &DQuat::default(),
+            &DMat4::default(),
+            1.0,
+            10.0,
+            16.0 / 9.0,
+            90.0,
+        )
     }
 }
-
+/// Contains the available projection types for the [`Camera`].
+pub enum Projection {
+    /// Similar to what we see in our day to day life.
+    Perspective {
+        /// Distance to the near clipping plane of the view frustum.
+        near_clip: f32,
+        /// Distance to the far clipping plane of the view frustum.
+        far_clip: f32,
+        /// Width divided by height of the view frustum.
+        aspect_ratio: f32,
+        /// Horizontal fov of the view frustum.
+        hfov: f32,
+    },
+    /// This type of projection is depth invariant. Obejcts farther away do not seem smaller.
+    Orthographic {
+        /// Width of the orthographic projection. (in meters)
+        width: f32,
+        /// Height of the orthographics projection. (in meters)
+        height: f32,
+    },
+}
 impl Camera {
+    /// Creates a new [`Camera`] from its fields.
+    pub fn new_perspective(
+        position: &DVec3,
+        quat: &DQuat,
+        transform: &DMat4,
+        near_clip: f32,
+        far_clip: f32,
+        aspect_ratio: f32,
+        hfov: f32,
+    ) -> Self {
+        let perspective = Projection::Perspective { near_clip, far_clip, aspect_ratio, hfov };
+        Camera {
+            position: position.clone(),
+            quat: quat.clone(),
+            transform: transform.clone(),
+            projection: perspective
+        }
+    }
     /// Gets an immutable reference to the position vector.
     ///
     /// # Returns
@@ -91,6 +124,17 @@ impl Camera {
         // Ensure the transformation matrix stays up to date.
         self.update_transform_rotation();
     }
+    /// Sets the camera rotation with a quaternion.
+    ///
+    /// # Arguments
+    ///
+    /// * `rot` - The rotation to set our camera to.
+    pub fn set_rotation(&mut self, rot: &DQuat) {
+        //q_total = q_second * q_first
+        self.quat = (*rot).normalize();
+        // Ensure the transformation matrix stays up to date.
+        self.update_transform_rotation();
+    }
     /// Updates the upper 3x3 section of the transformation matrix to match the rotation of the camera.
     fn update_transform_rotation(&mut self) {
         // Updates upper 3x3 matrix where the rotation part resides.
@@ -112,8 +156,38 @@ impl Camera {
         w_axis[2] = pos[2];
     }
     /// Updates the entire transformation matrix to match the rotation and position of the camera.
-    fn update_transform_all(&mut self) {
+    fn _update_transform_all(&mut self) {
         self.update_transform_rotation();
         self.update_transform_translation();
+    }
+    /// Obtain the view perspective matrix given a camera's view frustum.
+    pub fn perspective_transform(&self) -> DMat4 {
+        todo!("Create perspective transform matrix from camera frustum");
+    }
+}
+// Getters and setters.
+impl Camera {
+    /// Reference to the projection type of the [`Camera`].
+    pub fn projection(&self) -> &Projection {
+        &self.projection
+    }
+    /// Mutable reference to the projection type of the [`Camera`].
+    pub fn projection_mut(&mut self) -> &mut Projection {
+        &mut self.projection
+    }
+    /// Setter for the projection type of the [`Camera`].
+    pub fn set_projection(&mut self, projection: Projection) {
+        self.projection = projection
+    }
+    /// Gets the transformation matrix of the [`Camera`].
+    pub fn transform(&self) -> &DMat4 {
+        &self.transform
+    }
+    /// Gets the orientation of the [`Camera`].
+    pub fn camera_orientation(&self) -> DVec3 {
+        // Apply transformation to base orientation to get world orientation.
+        let ori = self.transform.mul_vec4(-DVec4::Z);
+        // Convert it to 3D.
+        DVec3::new(ori.x, ori.y, ori.z)
     }
 }

@@ -59,8 +59,22 @@ impl Screen {
         self.pixels = Some(pixels);
         Ok(())
     }
-    /// Mutable getter for the pixels instance.
+}
+impl Screen {
+    /// Mutable reference for the pixels instance.
     pub fn pixels_mut(&mut self) -> Option<&mut Pixels<'static>> {
         self.pixels.as_mut()
+    }
+    /// Mutable reference for the pixels depth buffer.
+    pub fn depth_buffer_mut(&mut self) -> &mut Vec<f32> {
+        &mut self.depth_buffer
+    }
+    /// Getter for screen width.
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+    /// Getter for screen height.
+    pub fn height(&self) -> u32 {
+        self.height
     }
 }

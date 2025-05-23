@@ -184,7 +184,7 @@ impl ApplicationHandler for App {
             _ => {}
         }
     }
-    fn about_to_wait(&mut self, event_loop: &event_loop::ActiveEventLoop) {
+    fn about_to_wait(&mut self, _event_loop: &event_loop::ActiveEventLoop) {
         // Handle actions.
         self.handle_actions();
         // Renders the screen into the pixel buffer.

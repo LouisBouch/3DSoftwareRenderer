@@ -19,17 +19,36 @@ impl Scene {
         let camera = Camera::default();
         Scene { camera, texture_catalog: TextureCatalog::new(), meshes: Vec::new() }
     }
-    /// Mutable getter for the camera.
-    pub fn camera_mut(&mut self) -> &mut Camera {
-        &mut self.camera
-    }
     /// Adds a mesh to the scene.
     pub fn add_mesh(&mut self, mesh: Mesh) {
         self.meshes.push(mesh);
     }
-    /// Mutable getter for the texture catalog.
+}
+// Getters and setters.
+impl Scene {
+    /// Mutable reference for the camera.
+    pub fn camera_mut(&mut self) -> &mut Camera {
+        &mut self.camera
+    }
+    /// Reference for the camera.
+    pub fn camera(&self) -> &Camera {
+        &self.camera
+    }
+    /// Mutable reference for the texture catalog.
     pub fn texture_catalog_mut(&mut self) -> &mut TextureCatalog {
         &mut self.texture_catalog
+    }
+    /// Reference for the texture catalog.
+    pub fn texture_catalog(&self) -> &TextureCatalog {
+        &self.texture_catalog
+    }
+    /// Mutable reference for the mesh vector.
+    pub fn meshes_mut(&mut self) -> &mut Vec<Mesh> {
+        &mut self.meshes
+    }
+    /// Reference for the mesh vector.
+    pub fn meshes(&self) -> &Vec<Mesh> {
+        &self.meshes
     }
 }
 pub mod camera;
