@@ -22,7 +22,8 @@ impl Mesh {
     /// object.
     /// * `world_transfrom` - The transform to convert the mesh from local to wrodl view.
     /// * `vertices` - The local vertices making up the mesh.
-    /// * `triangles` - The indices representing the triangle within the mesh.
+    /// * `triangles` - The indices representing the triangle within the mesh. (The triangles are
+    /// defined CCW when looked at from the exterior)
     ///
     /// # Warning
     ///

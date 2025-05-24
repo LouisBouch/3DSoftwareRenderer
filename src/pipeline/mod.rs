@@ -33,7 +33,7 @@ impl Pipeline {
             // Convert geometry to view space.
             geometry.lin_transform(camera.transform());
             // Do backface culling.
-            geometry.cull_backface(&camera.camera_orientation());
+            geometry.cull_backface(&camera.position());
             // Convert to clip space.
             geometry.lin_transform(&camera.perspective_transform());
             // Clip trianlges to view frustum.

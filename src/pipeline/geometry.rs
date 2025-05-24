@@ -1,6 +1,6 @@
 //! Contains the building block of the rendering pipeline. Everyting thing drawn on screen will be
 //! related to geometry.
-use glam::{DMat4, DVec2, DVec3, DVec4};
+use glam::{DMat4, DVec2, DVec3, DVec4, Vec4Swizzles};
 
 use crate::resources::mesh::Mesh;
 
@@ -13,7 +13,7 @@ pub struct Geometry {
     /// UV coordinates of the vertices.
     uvs: Vec<DVec2>,
     /// The list of indices that define the triangles in the mesh. Each successive 3 idex represent
-    /// a triangle.
+    /// a triangle. (Defined CCW)
     triangles: Vec<u32>,
     /// List of inverted w values from the homogeneous coordinates (in clip space before NDC conversion). Useful for interpolation in
     /// screen coordinates, as 1/w is linear in this space.
@@ -80,8 +80,37 @@ impl Geometry {
             pos[3] = 1.0;
         }
     }
-    /// Give the orientation of the camera, cull every triangle pointing away from it.
-    pub fn cull_backface(&mut self, camera_orientation: &DVec3) {}
+    /// Given the position of the camera, cull every triangle pointing away from it.
+    pub fn cull_backface(&mut self, camera_position: &DVec3) {
+        // Create a new list of triangles which are facing towards the camera.
+        let mut triangles = Vec::<u32>::with_capacity(self.triangles.len());
+        // Check each triangle within the mesh and only keep those pointing towards the camera.
+        for triangle_index_start in (0..self.triangles.len()).step_by(3) {
+            // Get the vertex indice corresponding to the triangle.
+            let indices = (
+                self.triangles[triangle_index_start],
+                self.triangles[triangle_index_start + 1],
+                self.triangles[triangle_index_start + 2],
+            );
+            // The three triangle vertices.
+            let (a, b, c) = (
+                self.positions[indices.0 as usize].xyz(),
+                self.positions[indices.1 as usize].xyz(),
+                self.positions[indices.2 as usize].xyz(),
+            );
+            // Vector from camera to first vertex of triangle.
+            let cam_to_tri = a - camera_position;
+            // Vector normal to the triangle pointing to the exterior of the mesh.
+            let tri_face_normal = (b-a).cross(c-a);
+            // If the triangle is pointing towards the camera, keep it.
+            if cam_to_tri.dot(tri_face_normal) < 0.0 {
+                triangles.push(indices.0);
+                triangles.push(indices.1);
+                triangles.push(indices.2);
+            }
+        }
+        self.triangles = triangles;
+    }
 
     /// Clip triangles that are straddling the x=±w, y=±w, or z=±w planes (this defines the view
     /// frustum). This creates new triangles in the process and removes some that are outside the planes.
