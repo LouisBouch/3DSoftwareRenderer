@@ -81,6 +81,8 @@ impl Geometry {
         }
     }
     /// Given the position of the camera, cull every triangle pointing away from it.
+    ///
+    /// * `camera_position` - The camera position in world space.
     pub fn cull_backface(&mut self, camera_position: &DVec3) {
         // Create a new list of triangles which are facing towards the camera.
         let mut triangles = Vec::<u32>::with_capacity(self.triangles.len());

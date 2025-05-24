@@ -53,14 +53,14 @@ pub enum Projection {
         far_clip: f32,
         /// Width divided by height of the view frustum.
         aspect_ratio: f32,
-        /// Horizontal fov of the view frustum.
+        /// Horizontal fov of the view frustum (In degrees).
         hfov: f32,
     },
     /// This type of projection is depth invariant. Obejcts farther away do not seem smaller.
     Orthographic {
-        /// Width of the orthographic projection. (in meters)
+        /// Width of the orthographic projection (in meters).
         width: f32,
-        /// Height of the orthographics projection. (in meters)
+        /// Height of the orthographics projection (in meters).
         height: f32,
     },
 }
@@ -159,10 +159,6 @@ impl Camera {
     fn _update_transform_all(&mut self) {
         self.update_transform_rotation();
         self.update_transform_translation();
-    }
-    /// Obtain the view perspective matrix given a camera's view frustum.
-    pub fn perspective_transform(&self) -> DMat4 {
-        todo!("Create perspective transform matrix from camera frustum");
     }
 }
 // Getters and setters.
