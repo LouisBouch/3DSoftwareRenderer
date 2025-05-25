@@ -27,6 +27,7 @@ pub mod pipeline;
 pub mod resources;
 pub mod scene;
 pub mod action;
+pub mod algorithm;
 
 // Default tests
 #[cfg(test)]
