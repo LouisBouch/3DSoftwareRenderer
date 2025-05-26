@@ -155,20 +155,20 @@ impl Geometry {
         // A cache that remembers which planes intersected with which edges and at which point.
         let mut intersection_cache: HashMap<(u32, u32, ClipPlane), u32> = HashMap::new();
         for triangle_index_start in (0..self.triangles.len()).step_by(3) {
-            // Get the vertex indice corresponding to the triangle.
-            let indices = vec![
+            // Get the vertex indice corresponding to the triangle. Make it the current shape.
+            let mut shape = vec![
                 self.triangles[triangle_index_start],
                 self.triangles[triangle_index_start + 1],
                 self.triangles[triangle_index_start + 2],
             ];
-            // List of vertex indices making up the new shape after clipping.
-            let mut shape: Vec<u32> = Vec::new();
             // Clip the triangle against the 6 clipping planes (x=±w, y=±w, and z=±w).
             for (plane_type, plane) in hyperplanes.iter() {
-                // Check whether the edge straddles the plane.
-                for edge in 0..3 {
-                    let ai = indices[edge];
-                    let bi = indices[(edge + 1) % 3];
+                // List of vertex indices making up the new shape after clipping.
+                let mut new_shape: Vec<u32> = Vec::new();
+                // Check whether the edges straddle the plane.
+                for edge in 0..shape.len() {
+                    let ai = shape[edge];
+                    let bi = shape[(edge + 1) % 3];
                     // The vertex positions of the edge.
                     let a = self.vertices[ai as usize];
                     let b = self.vertices[bi as usize];
@@ -185,10 +185,10 @@ impl Geometry {
                         // outside.
                         else {
                             if !b_in {
-                                shape.push(bi);
+                                new_shape.push(bi);
                             } else {
-                                shape.push(ai);
-                                shape.push(bi);
+                                new_shape.push(ai);
+                                new_shape.push(bi);
                             }
                             println!("Parallel issue: Sutherland-Hodgman");
                             continue;
@@ -200,7 +200,7 @@ impl Geometry {
                         }
                         // Check where this edge already has a computed intersection.
                         if let Some(&ci) = intersection_cache.get(&(e1, e2, *plane_type)) {
-                            shape.push(ci);
+                            new_shape.push(ci);
                         } else {
                             // Add the intersection to the list.
                             let c = a.lerp(b, t);
@@ -213,9 +213,10 @@ impl Geometry {
                     }
                     if b_in {
                         // Here b is inside.
-                        shape.push(bi);
+                        new_shape.push(bi);
                     }
                 }
+                shape = new_shape;
             }
             // Triangulate the shape.
             for v in 0..(shape.len() - 2) {
