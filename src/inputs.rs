@@ -136,18 +136,29 @@ impl InputHandler {
                 }
             }
         }
-        // Collect mouse movements.
-        if let Some(DVec2 { x, y }) = self.mouse_delta.as_ref() {
-            actions.push(Action::RotateCamera {
-                yaw: -x * self.sensitivity as f64,
-                pitch: -y * self.sensitivity as f64,
-            });
-            // Now that the action was prepared, reset the delta.
-            self.mouse_delta = None;
-        }
         // Delete from the list the keys that were released.
         for key in key_to_delete.iter() {
             self.key_states.remove(key);
+        }
+        // Collect mouse movements.
+        let shift_pressed = self.key_states.get(&KeyCode::ShiftLeft).is_some();
+        if let Some(DVec2 { x, y }) = self.mouse_delta.as_ref() {
+            // Roll instead when shfit is pressed.
+            if !shift_pressed {
+                actions.push(Action::RotateCamera {
+                    yaw: -x * self.sensitivity as f64,
+                    pitch: -y * self.sensitivity as f64,
+                    roll: 0.0,
+                });
+            } else {
+                actions.push(Action::RotateCamera {
+                    yaw: 0.0,
+                    pitch: 0.0,
+                    roll: -x * self.sensitivity as f64,
+                });
+            }
+            // Now that the action was prepared, reset the delta.
+            self.mouse_delta = None;
         }
         return actions;
     }
@@ -196,7 +207,7 @@ impl InputHandler {
     /// # Arguments
     ///
     /// * `delta` - The raw mouse input detected by the hardware.
-    pub fn mouse_moved_raw(&mut self, new_delta: &DVec2) {
+    pub fn mouse_move_raw(&mut self, new_delta: &DVec2) {
         // Add the delta if there is a delta.
         if let Some(current_delta) = self.mouse_delta.as_mut() {
             *current_delta += new_delta;

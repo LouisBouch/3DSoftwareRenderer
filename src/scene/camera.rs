@@ -1,6 +1,6 @@
 //! Contains everything realted to the [`Camera`].
 
-use glam::{DMat3, DMat4, DQuat, DVec3, DVec4};
+use glam::{DMat3, DMat4, DQuat, DVec3, DVec4, Quat};
 
 /// Contains the necessary information to define a [`Camera`].
 ///
@@ -17,7 +17,9 @@ pub struct Camera {
     /// Made from the position and quaternion.
     transform: DMat4,
     /// The type of projection the camera will use.
-    projection: Projection
+    projection: Projection,
+    /// Velocity of the camera (in meters/sec).
+    velocity: f64,
 }
 impl Default for Camera {
     /// Creates a default [`Camera`].
@@ -64,6 +66,21 @@ pub enum Projection {
         height: f32,
     },
 }
+/// Directions relative to the camera.
+pub enum Direction {
+    /// Forwards direction.
+    Forwards,
+    /// Backwards direction.
+    Backwards,
+    /// Left direction.
+    Left,
+    /// Right direction.
+    Right,
+    /// Up direction.
+    Up,
+    /// Down direction.
+    Down,
+}
 impl Camera {
     /// Creates a new [`Camera`] from its fields.
     pub fn new_perspective(
@@ -75,12 +92,18 @@ impl Camera {
         aspect_ratio: f32,
         hfov: f32,
     ) -> Self {
-        let perspective = Projection::Perspective { near_clip, far_clip, aspect_ratio, hfov };
+        let perspective = Projection::Perspective {
+            near_clip,
+            far_clip,
+            aspect_ratio,
+            hfov,
+        };
         Camera {
             position: position.clone(),
             quat: quat.clone(),
             transform: transform.clone(),
-            projection: perspective
+            projection: perspective,
+            velocity: 1.0,
         }
     }
     /// Gets an immutable reference to the position vector.
@@ -124,6 +147,39 @@ impl Camera {
         // Ensure the transformation matrix stays up to date.
         self.update_transform_rotation();
     }
+    /// Pitch the `camera` up or down.
+    ///
+    /// # Arguments
+    ///
+    /// * `angle` - Angle by which the `camera` is pitched (in radians).
+    /// `angle` > 0 means pitch up, and `angle` < 0 means pitch down (right hand rule).
+    pub fn pitch(&mut self, angle: f64) {
+        let axis = self.quat.mul_vec3(DVec3::X);
+        let quat = DQuat::from_axis_angle(axis, angle);
+        self.rotate(&quat);
+    }
+    /// Yaw the `camera` right or left.
+    ///
+    /// # Arguments
+    ///
+    /// * `angle` - Angle by which the `camera` is yawed (in radians).
+    /// `angle` > 0 means yaw left, and `angle` < 0 means yaw right (right hand rule).
+    pub fn yaw(&mut self, angle: f64) {
+        let axis = self.quat.mul_vec3(DVec3::Y);
+        let quat = DQuat::from_axis_angle(axis, angle);
+        self.rotate(&quat);
+    }
+    /// Roll the `camera` CW or CCW (as seen when looking forwards).
+    ///
+    /// # Arguments
+    ///
+    /// * `angle` - Angle by which the `camera` is rolled (in radians).
+    /// `angle` > 0 means CW rotation, and `angle` < 0 means CCW rotation (right hand rule).
+    pub fn roll(&mut self, angle: f64) {
+        let axis = self.quat.mul_vec3(DVec3::NEG_Z);
+        let quat = DQuat::from_axis_angle(axis, angle);
+        self.rotate(&quat);
+    }
     /// Sets the camera rotation with a quaternion.
     ///
     /// # Arguments
@@ -160,6 +216,25 @@ impl Camera {
         self.update_transform_rotation();
         self.update_transform_translation();
     }
+    /// Move the camera in the specified direction.
+    ///
+    /// # Arguments
+    ///
+    /// * `direction` - Direction in which to move the camera.
+    /// * `distance` - Time over which the camera has moved (in seconds).
+    pub fn move_cam(&mut self, dt: f64, direction: Direction) {
+        let direction = self.quat.mul_vec3(match direction {
+            Direction::Forwards => DVec3::NEG_Z,
+            Direction::Backwards => DVec3::Z,
+            Direction::Left => DVec3::NEG_X,
+            Direction::Right => DVec3::X,
+            Direction::Up => DVec3::Y,
+            Direction::Down => DVec3::NEG_Y,
+        });
+        self.position += direction * dt * self.velocity;
+        // Update transformation matrix to reflect the changes.
+        self.update_transform_translation();
+    }
 }
 // Getters and setters.
 impl Camera {
@@ -185,5 +260,13 @@ impl Camera {
         let ori = self.transform.mul_vec4(-DVec4::Z);
         // Convert it to 3D.
         DVec3::new(ori.x, ori.y, ori.z)
+    }
+    /// Gets the velocity of the camera.
+    pub fn velocity(&self) -> f64 {
+        self.velocity
+    }
+    /// Sets the velocity of the camera.
+    pub fn set_velocity(&mut self, velocity: f64) {
+        self.velocity = velocity;
     }
 }

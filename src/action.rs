@@ -23,5 +23,7 @@ pub enum Action {
         pitch: f64,
         /// Change in yaw/horizontal angle (Rads).
         yaw: f64,
+        /// Change in roll/CW angle (Rads).
+        roll: f64,
     },
 }

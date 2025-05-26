@@ -1,6 +1,7 @@
 //! Exposes the API that will be used to create an interactable window that can be drawn on.
 
 use crate::action::Action;
+use crate::pipeline::Pipeline;
 use crate::{
     graphics::{self, screen::Screen, window::Window},
     inputs,
@@ -21,6 +22,10 @@ pub struct App {
     input_state: inputs::InputHandler,
     /// Contains everything needed to render the environment.
     scene: scene::Scene,
+    /// Number of frames per second.
+    fps: u32,
+    /// The pipeline that is used to transform the data into a rasterized image.
+    pipeline: Pipeline,
 }
 impl App {
     /// Creates an app.
@@ -40,11 +45,15 @@ impl App {
         let window = Window::new(width, height);
         let input_state = inputs::InputHandler::new();
         let screen = Screen::new(width, height);
+        let fps = 100;
+        let pipeline = Pipeline::new();
         App {
             window,
             screen,
             input_state,
             scene,
+            fps,
+            pipeline,
         }
     }
     /// Creates an app.
@@ -69,31 +78,45 @@ impl App {
     /// These actions will include mouse movements too, whose magnitude will need to be queried.
     fn handle_actions(&mut self) {
         let actions = self.input_state.collect_actions();
+        let camera = self.scene.camera_mut();
         for action in actions.iter() {
             match action {
                 Action::MoveForwards => {
-                    self.scene.camera_mut().add_position(&DVec3::Y);
+                    camera.move_cam(1.0 / (self.fps as f64), scene::camera::Direction::Forwards);
                 }
                 Action::MoveBackwards => {
-                    self.scene.camera_mut().add_position(&-DVec3::Y);
+                    camera.move_cam(1.0 / (self.fps as f64), scene::camera::Direction::Backwards);
                 }
                 Action::MoveLeft => {
-                    self.scene.camera_mut().add_position(&-DVec3::X);
+                    camera.move_cam(1.0 / (self.fps as f64), scene::camera::Direction::Left);
                 }
                 Action::MoveRight => {
-                    self.scene.camera_mut().add_position(&DVec3::X);
+                    camera.move_cam(1.0 / (self.fps as f64), scene::camera::Direction::Right);
                 }
                 Action::MoveUp => {
-                    println!("Up");
+                    camera.move_cam(1.0 / (self.fps as f64), scene::camera::Direction::Up);
                 }
                 Action::MoveDown => {
-                    println!("Down");
+                    camera.move_cam(1.0 / (self.fps as f64), scene::camera::Direction::Down);
                 }
-                Action::RotateCamera { pitch, yaw } => {
-                    println!("Rotate, pitch: {}, yaw: {}", pitch, yaw);
+                Action::RotateCamera { pitch, yaw, roll } => {
+                    camera.yaw(*yaw);
+                    camera.pitch(*pitch);
+                    camera.roll(*roll);
+                    // // Rotate around world's y axis. Simulates FPS camera.
+                    // let fixed_yaw_qat = DQuat::from_axis_angle(DVec3::Y, *yaw);
+                    // camera.rotate(&fixed_yaw_qat);
+                    //
+                    // // Rotate around world's x axis. Simulates FPS camera.
+                    // let fixed_pitch_qat = DQuat::from_axis_angle(DVec3::X, *pitch);
+                    // camera.rotate(&fixed_pitch_qat);
                 }
             }
         }
+    }
+    /// Sets the frames per second of the software renderer.
+    pub fn set_fps(&mut self, fps: u32) {
+        self.fps = fps;
     }
 }
 
@@ -136,7 +159,6 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                // println!("Redrawing requested.");
                 let pixels = self.screen.pixels_mut().unwrap();
                 let pixel_index: u32;
                 let frame = pixels.frame_mut();
@@ -147,13 +169,6 @@ impl ApplicationHandler for App {
                 frame[pixel_index as usize + 1] = 0;
                 frame[pixel_index as usize + 2] = 255;
                 frame[pixel_index as usize + 3] = 255;
-                // for i in 0..20000 {
-                //     pixel_index = i * 4;
-                //     frame[pixel_index as usize] = 255;
-                //     frame[pixel_index as usize + 1] = 255;
-                //     frame[pixel_index as usize + 2] = 255;
-                //     frame[pixel_index as usize + 3] = 255;
-                // }
                 pixels.render().unwrap();
             }
             WindowEvent::KeyboardInput { event, .. } => {
@@ -179,7 +194,7 @@ impl ApplicationHandler for App {
         match event {
             DeviceEvent::MouseMotion { delta } => {
                 self.input_state
-                    .mouse_moved_raw(&DVec2::new(delta.0, delta.1));
+                    .mouse_move_raw(&DVec2::new(delta.0, delta.1));
             }
             _ => {}
         }
@@ -188,6 +203,7 @@ impl ApplicationHandler for App {
         // Handle actions.
         self.handle_actions();
         // Renders the screen into the pixel buffer.
+        self.pipeline.process_scene(&self.scene, &mut self.screen);
         // Redraws the screen.
         self.window
             .winit_window_mut()
