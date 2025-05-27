@@ -1,6 +1,6 @@
 //! Contains everything realted to the [`Camera`].
 
-use glam::{DMat3, DMat4, DQuat, DVec3, DVec4, Quat};
+use glam::{DMat3, DMat4, DQuat, DVec3, DVec4};
 
 /// Contains the necessary information to define a [`Camera`].
 ///

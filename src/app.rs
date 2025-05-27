@@ -7,7 +7,7 @@ use crate::{
     inputs,
     scene::{self, Scene},
 };
-use glam::{DVec2, DVec3};
+use glam::DVec2;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, ElementState};
 use winit::{event::WindowEvent, event_loop};
@@ -159,17 +159,23 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
+                // Reset screen.
+                self.screen.screen_clear();
+
+                // Get pixels.
                 let pixels = self.screen.pixels_mut().unwrap();
-                let pixel_index: u32;
-                let frame = pixels.frame_mut();
-                let camera_pos = self.scene.camera_mut().position();
-                pixel_index =
-                    (camera_pos.x * 4.0 - self.window.width() as f64 * 4.0 * camera_pos.y) as u32;
-                frame[pixel_index as usize] = 255;
-                frame[pixel_index as usize + 1] = 0;
-                frame[pixel_index as usize + 2] = 255;
-                frame[pixel_index as usize + 3] = 255;
+
+                // Render them.
                 pixels.render().unwrap();
+                // let frame = pixels.frame_mut();
+                // let pixel_index: u32;
+                // let camera_pos = self.scene.camera_mut().position();
+                // pixel_index =
+                //     (camera_pos.x * 4.0 - self.window.width() as f64 * 4.0 * camera_pos.y) as u32;
+                // frame[pixel_index as usize] = 255;
+                // frame[pixel_index as usize + 1] = 0;
+                // frame[pixel_index as usize + 2] = 255;
+                // frame[pixel_index as usize + 3] = 255;
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 let key_state = event.state;

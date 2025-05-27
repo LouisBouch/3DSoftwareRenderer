@@ -27,7 +27,6 @@ pub struct InputHandler {
     held_action: HashMap<KeyCode, Action>,
     /// List of action for each key when it is released.
     released_action: HashMap<KeyCode, Action>,
-    // TODO: Include mouse events
     /// Converts hardware mouse changes into camera rotation.
     sensitivity: f32,
     /// Change in mouse position since last time the inputs were checked.

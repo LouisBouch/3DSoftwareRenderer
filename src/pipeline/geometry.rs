@@ -3,7 +3,6 @@
 use std::collections::HashMap;
 
 use glam::{usize, DMat4, DVec2, DVec3, DVec4, Vec4Swizzles};
-use ndarray::array;
 
 use crate::{algorithm, resources::mesh::Mesh};
 
@@ -227,6 +226,16 @@ impl Geometry {
         }
         self.triangles = triangles;
     }
+    /// Uses the current w value to create the `clip_w_inv` values. Just does 1/w.
+    ///
+    /// This method is called when we enter clip space, as the 1/w at this point is linear in ndc
+    /// space, and used for interpolation of uv coordinates.
+    pub fn set_clip_w_inv(&mut self) {
+        self.clip_w_inv.clear();
+        for vertex in self.vertices.iter() {
+            self.clip_w_inv.push(1.0/vertex[3]);
+        }
+    }
 }
 // Getters and setters
 impl Geometry {
@@ -234,13 +243,25 @@ impl Geometry {
     pub fn vertices_mut(&mut self) -> &mut Vec<DVec4> {
         &mut self.vertices
     }
+    /// Reference to the positions of the vertices making up the mesh.
+    pub fn vertices(&self) -> &Vec<DVec4> {
+        &self.vertices
+    }
     /// Mutable reference to the uv coordinates of the vertices making up the mesh.
     pub fn uvs_mut(&mut self) -> &mut Vec<DVec2> {
         &mut self.uvs
     }
+    /// Reference to the uv coordinates of the vertices making up the mesh.
+    pub fn uvs(&self) -> &Vec<DVec2> {
+        &self.uvs
+    }
     /// Mutable reference to the triangles making up the mesh.
     pub fn triangles_mut(&mut self) -> &mut Vec<u32> {
         &mut self.triangles
+    }
+    /// Reference to the triangles making up the mesh.
+    pub fn triangles(&self) -> &Vec<u32> {
+        &self.triangles
     }
     /// Mutable reference to the inverted w of the homogeneous coordinate of the vertices making up the mesh.
     ///

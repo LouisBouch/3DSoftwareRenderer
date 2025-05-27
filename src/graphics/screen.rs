@@ -59,6 +59,13 @@ impl Screen {
         self.pixels = Some(pixels);
         Ok(())
     }
+    /// Clears the screen to black, and resets depth buffer.
+    pub fn screen_clear(&mut self) {
+        // Reset screen.
+        for pixel in self.pixels_mut().unwrap().frame_mut().chunks_exact_mut(4) {
+            pixel.copy_from_slice(&[0, 0, 0, 255]);
+        }
+    }
 }
 impl Screen {
     /// Mutable reference for the pixels instance.
