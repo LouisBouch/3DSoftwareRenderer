@@ -269,6 +269,12 @@ impl Geometry {
     pub fn clip_w_inv_mut(&mut self) -> &mut Vec<f64> {
         &mut self.clip_w_inv
     }
+    /// Reference to the inverted w of the homogeneous coordinate of the vertices making up the mesh.
+    ///
+    /// This value is used when linearly interpolating coordinates in screen space.
+    pub fn clip_w_inv(&self) -> &Vec<f64> {
+        &self.clip_w_inv
+    }
     /// Gets the texture id if there is one.
     pub fn texture_id(&self) -> Option<u32> {
         self.texture_id

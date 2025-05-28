@@ -1,6 +1,6 @@
 //! Handles the loading of all ressources.
 
-use glam::{DMat4, DVec2, DVec3};
+use glam::{DVec2, DVec3};
 
 use crate::resources::{mesh::Vertex, texture::Texture};
 
@@ -108,7 +108,6 @@ impl MeshLoader {
         match mesh {
             DefaultMesh::Cube(size) => {
                 let half_size = size / 2.0;
-                let transform = DMat4::default();
                 let mut vertices = Vec::<Vertex>::with_capacity(8);
                 // List of possible corner positions.
                 let corners = [
@@ -173,7 +172,7 @@ impl MeshLoader {
                     triangles.push(4 * i + 3);
                     triangles.push(4 * i + 0);
                 }
-                Mesh::new(texture_id, transform, vertices, triangles)
+                Mesh::new(texture_id, vertices, triangles)
             }
         }
     }

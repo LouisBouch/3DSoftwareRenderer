@@ -1,3 +1,4 @@
+use glam::DVec3;
 // use glam::vec2;
 // use ndarray;
 // let a: ndarray::Array2<i32> = ndarray::Array2::from_shape_vec((2, 3), b).unwrap();
@@ -23,6 +24,7 @@ fn main() -> Result<(), winit::error::EventLoopError> {
 
     // Populate the scene.
     let mut cube = mesh_loader.load_default_mesh(DefaultMesh::Cube(100.0), None);
+    cube.translate(DVec3::new(0.0, 0.0, -2.0));
     let checkered_id = scene
         .texture_catalog_mut()
         .add_texture(

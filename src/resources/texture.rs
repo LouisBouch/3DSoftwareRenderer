@@ -88,7 +88,7 @@ pub struct Texture {
     format: Format,
 }
 impl Texture {
-    /// Create a new invisible texture instance.
+    /// Create a new black texture instance.
     ///
     /// # Arguments
     ///
@@ -101,12 +101,15 @@ impl Texture {
     /// The new instance created through the function.
     pub fn new(width: u32, height: u32, format: Format) -> Self {
         match format {
-            Format::RGBA32 => Texture {
-                pixels: vec![0; 4 * width as usize * height as usize],
-                width,
-                height,
-                format,
-            },
+            Format::RGBA32 => {
+                let pixel = [0, 0, 0, 255];
+                Texture {
+                    pixels: pixel.repeat(width as usize * height as usize),
+                    width,
+                    height,
+                    format,
+                }
+            }
             Format::RGB24 => Texture {
                 pixels: vec![0; 3 * width as usize * height as usize],
                 width,
@@ -152,6 +155,33 @@ impl Texture {
             height,
             format,
         })
+    }
+    /// Obtain the pixel value of the texture given uv coordinates.
+    ///
+    /// # Arguments
+    ///
+    /// * `u` - U coordinate of the texture. Values above 1 will loop back to 0.
+    /// * `v` - V coordinate of the texture. Values above 1 will loop back to 0.
+    ///
+    /// # Return
+    ///
+    /// A slice of the texture representing the pixel at the UV coordinates.
+    pub fn from_uv(&self, u: f64, v: f64) -> &[u8] {
+        let nb_channels = match self.format {
+            Format::RGBA32 => 4,
+            Format::RGB24 => 3,
+        };
+        let x = ((u * self.width as f64).floor() as usize) % self.width as usize;
+        let y = ((v * self.height as f64).floor() as usize) % self.height() as usize;
+        let index = (x + y * self.width as usize) * nb_channels;
+        &self.pixels[index..index + nb_channels]
+    }
+    /// Obtains the number of channels the format requires.
+    pub fn nb_chanels(&self) -> u32 {
+        match self.format {
+            Format::RGBA32 => 4,
+            Format::RGB24 => 3,
+        }
     }
 }
 // Getters and setters.
