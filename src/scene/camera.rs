@@ -1,6 +1,6 @@
 //! Contains everything realted to the [`Camera`].
 
-use glam::{DMat3, DMat4, DQuat, DVec3, DVec4};
+use glam::{DMat4, DQuat, DVec3, DVec4};
 
 /// Contains the necessary information to define a [`Camera`].
 ///
@@ -37,9 +37,8 @@ impl Default for Camera {
         Camera::new_perspective(
             &DVec3::ZERO,
             &DQuat::default(),
-            &DMat4::default(),
-            1.0,
             10.0,
+            1000.0,
             16.0 / 9.0,
             90.0,
         )
@@ -86,7 +85,6 @@ impl Camera {
     pub fn new_perspective(
         position: &DVec3,
         quat: &DQuat,
-        transform: &DMat4,
         near_clip: f32,
         far_clip: f32,
         aspect_ratio: f32,
@@ -98,13 +96,16 @@ impl Camera {
             aspect_ratio,
             hfov,
         };
-        Camera {
+        let mut c = Camera {
             position: position.clone(),
             quat: quat.clone(),
-            transform: transform.clone(),
+            transform: DMat4::IDENTITY,
             projection: perspective,
-            velocity: 1.0,
-        }
+            velocity: 500.0,
+        };
+        c.update_transform();
+        c
+
     }
     /// Gets an immutable reference to the position vector.
     ///
@@ -122,7 +123,7 @@ impl Camera {
     pub fn add_position(&mut self, change: &DVec3) {
         self.position += change;
         // Update transformation matrix to reflect the changes.
-        self.update_transform_translation();
+        self.update_transform();
     }
     /// Sets the position of the camera.
     ///
@@ -134,7 +135,7 @@ impl Camera {
         self.position[1] = new_pos[1];
         self.position[2] = new_pos[2];
         // Update transformation matrix to reflect the changes.
-        self.update_transform_translation();
+        self.update_transform();
     }
     /// Rotates the camera by a quaternion.
     ///
@@ -145,7 +146,7 @@ impl Camera {
         //q_total = q_second * q_first
         self.quat = rot.mul_quat(self.quat).normalize();
         // Ensure the transformation matrix stays up to date.
-        self.update_transform_rotation();
+        self.update_transform();
     }
     /// Pitch the `camera` up or down.
     ///
@@ -189,32 +190,11 @@ impl Camera {
         //q_total = q_second * q_first
         self.quat = (*rot).normalize();
         // Ensure the transformation matrix stays up to date.
-        self.update_transform_rotation();
-    }
-    /// Updates the upper 3x3 section of the transformation matrix to match the rotation of the camera.
-    fn update_transform_rotation(&mut self) {
-        // Updates upper 3x3 matrix where the rotation part resides.
-        let rot_matrix = DMat3::from_quat(self.quat);
-        for col in 0..3 {
-            let tran_col = self.transform.col_mut(col);
-            let rot_col = rot_matrix.col(col);
-            for row in 0..3 {
-                tran_col[row] = rot_col[row];
-            }
-        }
-    }
-    /// Updates the right most column of the transformation matrix to match the position of the camera.
-    fn update_transform_translation(&mut self) {
-        let mut w_axis = self.transform.w_axis;
-        let pos = self.position;
-        w_axis[0] = pos[0];
-        w_axis[1] = pos[1];
-        w_axis[2] = pos[2];
+        self.update_transform();
     }
     /// Updates the entire transformation matrix to match the rotation and position of the camera.
-    fn _update_transform_all(&mut self) {
-        self.update_transform_rotation();
-        self.update_transform_translation();
+    fn update_transform(&mut self) {
+        self.transform = DMat4::from_translation(self.position) * DMat4::from_quat(self.quat);
     }
     /// Move the camera in the specified direction.
     ///
@@ -233,7 +213,7 @@ impl Camera {
         });
         self.position += direction * dt * self.velocity;
         // Update transformation matrix to reflect the changes.
-        self.update_transform_translation();
+        self.update_transform();
     }
 }
 // Getters and setters.

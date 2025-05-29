@@ -1,5 +1,7 @@
 //! Exposes the API that will be used to create an interactable window that can be drawn on.
 
+use std::time::{Duration, Instant};
+
 use crate::action::Action;
 use crate::pipeline::Pipeline;
 use crate::{
@@ -10,6 +12,7 @@ use crate::{
 use glam::DVec2;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, ElementState};
+use winit::event_loop::ControlFlow;
 use winit::{event::WindowEvent, event_loop};
 
 /// Contains the window, screen that is within the window and the input manager.
@@ -26,6 +29,8 @@ pub struct App {
     fps: u32,
     /// The pipeline that is used to transform the data into a rasterized image.
     pipeline: Pipeline,
+    /// The time at which the last frame started executing.
+    last_frame_time: Instant,
 }
 impl App {
     /// Creates an app.
@@ -47,6 +52,7 @@ impl App {
         let screen = Screen::new(width, height);
         let fps = 100;
         let pipeline = Pipeline::new();
+        let last_frame_time = Instant::now();
         App {
             window,
             screen,
@@ -54,6 +60,7 @@ impl App {
             scene,
             fps,
             pipeline,
+            last_frame_time,
         }
     }
     /// Creates an app.
@@ -138,13 +145,6 @@ impl ApplicationHandler for App {
             eprintln!("Failed to initialize screen: {e}");
             std::process::exit(1);
         }
-        // TODO: Use something similar to capture the mouse.
-        // self.window
-        //     .winit_window
-        //     .as_mut()
-        //     .unwrap()
-        //     .set_cursor_grab(winit::window::CursorGrabMode::Confined)
-        //     .unwrap();
     }
 
     fn window_event(
@@ -159,9 +159,6 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                // Reset screen.
-                self.screen.screen_clear();
-
                 // Get pixels.
                 let pixels = self.screen.pixels_mut().unwrap();
 
@@ -176,6 +173,9 @@ impl ApplicationHandler for App {
                 // frame[pixel_index as usize + 1] = 0;
                 // frame[pixel_index as usize + 2] = 255;
                 // frame[pixel_index as usize + 3] = 255;
+
+                // Reset screen.
+                self.screen.screen_clear();
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 let key_state = event.state;
@@ -188,6 +188,30 @@ impl ApplicationHandler for App {
                     ElementState::Released => self.input_state.release_key(key_code),
                 }
             }
+            WindowEvent::Focused(focused) => {
+                let winit_window = self.window.winit_window_mut();
+                // Capture mouse and make it invisible.
+                match winit_window {
+                    Some(w) => {
+                        if focused {
+                            w.set_cursor_visible(false);
+                            w.set_cursor_grab(winit::window::CursorGrabMode::Confined)
+                                .unwrap_or_else(|e| {
+                                    eprintln!("Could not capture mouse: {e}");
+                                    w.set_cursor_visible(true);
+                                });
+                        } else {
+                            w.set_cursor_visible(true);
+                            w.set_cursor_grab(winit::window::CursorGrabMode::None)
+                                .unwrap_or_else(|e| {
+                                    eprintln!("Could not release mouse: {e}");
+                                });
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
             _ => {}
         }
     }
@@ -205,15 +229,21 @@ impl ApplicationHandler for App {
             _ => {}
         }
     }
-    fn about_to_wait(&mut self, _event_loop: &event_loop::ActiveEventLoop) {
+    fn about_to_wait(&mut self, event_loop: &event_loop::ActiveEventLoop) {
+        let next_frame_time =
+            self.last_frame_time + Duration::new((1.0 / self.fps as f32) as u64, 0);
         // Handle actions.
         self.handle_actions();
         // Renders the screen into the pixel buffer.
         self.pipeline.process_scene(&self.scene, &mut self.screen);
+        // self.screen.draw_texture(self.scene.texture_catalog().textures().get(&1).unwrap());
         // Redraws the screen.
         self.window
             .winit_window_mut()
             .expect("Window should be initialized")
             .request_redraw();
+
+        // Wait until next frame before rendering again.
+        event_loop.set_control_flow(ControlFlow::WaitUntil(next_frame_time));
     }
 }

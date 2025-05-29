@@ -56,7 +56,7 @@ impl Geometry {
         }
         Geometry {
             texture_id: mesh.texture_id(),
-            clip_w_inv: vec![1.0; vertices.len() as usize],
+            clip_w_inv: Vec::new(),
             vertices,
             uvs,
             triangles,
@@ -83,6 +83,8 @@ impl Geometry {
         }
     }
     /// Given the position of the camera, cull every triangle pointing away from it.
+    /// Needs to be called when the geoemtry is in world space. If in camera space, use
+    /// camera_position = 0.
     ///
     /// * `camera_position` - The camera position in world space.
     pub fn cull_backface(&mut self, camera_position: &DVec3) {
@@ -90,7 +92,7 @@ impl Geometry {
         let mut triangles = Vec::<u32>::with_capacity(self.triangles.len());
         // Check each triangle within the mesh and only keep those pointing towards the camera.
         for triangle_index_start in (0..self.triangles.len()).step_by(3) {
-            // Get the vertex indice corresponding to the triangle.
+            // Get the vertex indices corresponding to the triangle.
             let (ai, bi, ci) = (
                 self.triangles[triangle_index_start],
                 self.triangles[triangle_index_start + 1],
@@ -135,51 +137,61 @@ impl Geometry {
         // Check each triangle within the mesh and clip those straddling the frustum and remove
         // those outside of it.
         //
-        // Quick proof to show the hyperplane normal points outside the frustum.
-        //
-        // We know that -w<=x<=w. Thus, for the hyperplane x=w, values inside the frustum require x<w.
+        // We know that -w<=x<=w for x to be in the frustum.
+        // Thus, for the hyperplane x-w=0, values inside the frustum require x<w.
         // Also, a point p will be on the positive side of the hyperplane (same direction as normal) when
-        // n.(p-p_0) > 0, and negative side otherwise.
+        // n.(p-p_0) > 0, and negative side otherwise. (p_0 = 0 for our hyperplanes)
         // Given that a point within the frustum (in x) will yield
-        // n.(p-p_0) = n.p = x - w < 0, we have that it is in the negative direction.
-        // This means the normal must be pointing outside the frustum.
+        // n.(p-p_0) = n.p = x - w < 0, we have that it is in the negative direction when using the
+        // plane x=w.
+        // This means the normal is pointing outside the frustum.
+        //
+        // Similarly, for the hyperplane -x-w=0, values inside the frustum require x>-w.
+        // Thus, n.(p-p_0) = n.p = -x - w > 0.
+        //
+        // This shows that using normals [1,0,0,-1] and [-1,0,0,-1] for our hyperplanes give us
+        // negative dot products when the point is inside, and positive dot products when the point
+        // is outside.
+        //
         let hyperplanes = vec![
             (ClipPlane::XP, DVec4::new(1.0, 0.0, 0.0, -1.0)),
-            (ClipPlane::XN, DVec4::new(1.0, 0.0, 0.0, 1.0)),
+            (ClipPlane::XN, DVec4::new(-1.0, 0.0, 0.0, -1.0)),
             (ClipPlane::YP, DVec4::new(0.0, 1.0, 0.0, -1.0)),
-            (ClipPlane::YN, DVec4::new(0.0, 1.0, 0.0, 1.0)),
+            (ClipPlane::YN, DVec4::new(0.0, -1.0, 0.0, -1.0)),
             (ClipPlane::ZP, DVec4::new(0.0, 0.0, 1.0, -1.0)),
-            (ClipPlane::ZN, DVec4::new(0.0, 0.0, 1.0, 1.0)),
+            (ClipPlane::ZN, DVec4::new(0.0, 0.0, -1.0, -1.0)),
         ];
         // A cache that remembers which planes intersected with which edges and at which point.
         let mut intersection_cache: HashMap<(u32, u32, ClipPlane), u32> = HashMap::new();
         for triangle_index_start in (0..self.triangles.len()).step_by(3) {
-            // Get the vertex indice corresponding to the triangle. Make it the current shape.
+            // Get the vertex indices corresponding to the triangle. Make it the current shape.
             let mut shape = vec![
                 self.triangles[triangle_index_start],
                 self.triangles[triangle_index_start + 1],
                 self.triangles[triangle_index_start + 2],
             ];
             // Clip the triangle against the 6 clipping planes (x=±w, y=±w, and z=±w).
-            for (plane_type, plane) in hyperplanes.iter() {
+            for (plane_type, plane_n) in hyperplanes.iter() {
                 // List of vertex indices making up the new shape after clipping.
                 let mut new_shape: Vec<u32> = Vec::new();
                 // Check whether the edges straddle the plane.
                 for edge in 0..shape.len() {
                     let ai = shape[edge];
-                    let bi = shape[(edge + 1) % 3];
+                    let bi = shape[(edge + 1) % shape.len()];
+                    // let ai = shape[(edge + shape.len() - 1) % shape.len()];
+                    // let bi = shape[edge];
                     // The vertex positions of the edge.
                     let a = self.vertices[ai as usize];
                     let b = self.vertices[bi as usize];
                     // Check whether a and b are inside or outside the plane.
-                    let a_in = a.dot(*plane) <= 0.0;
-                    let b_in = b.dot(*plane) <= 0.0;
+                    let a_in = plane_n.dot(a) <= 0.0;
+                    let b_in = plane_n.dot(b) <= 0.0;
 
                     // Sutherland-Hodgman algorithm.
                     if (b_in && !a_in) || (a_in && !b_in) {
                         // Here b is inside but not a, or a is inside but not b.
                         let Some(t) =
-                            algorithm::lin_plane_intersect4(DVec4::ZERO, *plane, a, b - a)
+                            algorithm::lin_plane_intersect4(DVec4::ZERO, *plane_n, a, b - a)
                         // If t is parallel to the plane, add b when it is outside or both if a is
                         // outside.
                         else {
@@ -197,17 +209,23 @@ impl Geometry {
                         if ai > bi {
                             (e1, e2) = (bi, ai);
                         }
-                        // Check where this edge already has a computed intersection.
+                        // Check whether this edge already has a computed intersection.
                         if let Some(&ci) = intersection_cache.get(&(e1, e2, *plane_type)) {
                             new_shape.push(ci);
                         } else {
-                            // Add the intersection to the list.
+                            // Add the intersection to the geometry.
+                            // TODO: Don't add it directly to the geometry, as some intersections
+                            // are later removed through other plane clipping.
                             let c = a.lerp(b, t);
-                            let uv = self.uvs[ai as usize].lerp(self.uvs[bi as usize], t);
-                            let ci = self.vertices.len() as u32;
                             self.vertices.push(c);
+
+                            let uv = self.uvs[ai as usize].lerp(self.uvs[bi as usize], t);
                             self.uvs.push(uv);
+
+                            // And add it to the new shape.
+                            let ci = (self.vertices.len() - 1) as u32;
                             intersection_cache.insert((e1, e2, *plane_type), ci);
+                            new_shape.push(ci);
                         }
                     }
                     if b_in {
@@ -217,11 +235,14 @@ impl Geometry {
                 }
                 shape = new_shape;
             }
-            // Triangulate the shape.
-            for v in 0..(shape.len() - 2) {
-                triangles.push(shape[v]);
-                triangles.push(shape[v + 1]);
-                triangles.push(shape[v + 2]);
+            // Triangulate the shape, if it exists.
+            if shape.len() >= 3 {
+                let fan_base = shape[0];
+                for v in 1..(shape.len() - 1) {
+                    triangles.push(fan_base);
+                    triangles.push(shape[v]);
+                    triangles.push(shape[v + 1]);
+                }
             }
         }
         self.triangles = triangles;
@@ -233,7 +254,7 @@ impl Geometry {
     pub fn set_clip_w_inv(&mut self) {
         self.clip_w_inv.clear();
         for vertex in self.vertices.iter() {
-            self.clip_w_inv.push(1.0/vertex[3]);
+            self.clip_w_inv.push(1.0 / vertex[3]);
         }
     }
 }

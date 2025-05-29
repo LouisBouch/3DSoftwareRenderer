@@ -45,7 +45,7 @@ impl TextureLoader {
                         // Check in which quadrant the pixel is being drawn. Decide on color based
                         // on that.
                         let color = if !(x_left ^ y_lower) { 255 } else { 0 };
-                        // Set the color of each channel to 255 or 0 (black or white).
+                        // Set the color of each channel to 0 or 255 (black or white).
                         for _ in 0..format_nb_channels {
                             // pixels[(row * size + col) as usize + channel] = color;
                             pixels.push(color);
@@ -53,9 +53,9 @@ impl TextureLoader {
                     }
                 }
                 // Finally, create the texture.
-                Texture::from_pixels(100, 100, &pixels, Format::RGB24).unwrap_or_else(|e| {
+                Texture::from_pixels(size, size, &pixels, Format::RGB24).unwrap_or_else(|e| {
                     eprintln!("Could not create texture: {e}");
-                    Texture::new(100, 100, Format::RGB24)
+                    Texture::new(size, size, Format::RGB24)
                 })
             }
         }
@@ -89,6 +89,7 @@ pub enum DefaultTexture {
     ///
     /// - `u32` The size (in pixels) of the texture's primitve, which is a 2x2 square of black and
     /// white squares.
+    // TODO: Add option that dictates how many squares appear in a row of the checkered texture.
     Checkered(u32),
 }
 
@@ -174,6 +175,49 @@ impl MeshLoader {
                 }
                 Mesh::new(texture_id, vertices, triangles)
             }
+            DefaultMesh::SingleFace(size) => {
+                let half_size = size / 2.0;
+                let mut vertices = Vec::<Vertex>::with_capacity(4);
+                // List of possible corner positions.
+                let corners = [
+                    DVec3::new(0.0, 0.0, 0.0) - half_size,
+                    DVec3::new(size, 0.0, 0.0) - half_size,
+                    DVec3::new(size, 0.0, size) - half_size,
+                    DVec3::new(0.0, 0.0, size) - half_size,
+                    DVec3::new(0.0, size, 0.0) - half_size,
+                    DVec3::new(size, size, 0.0) - half_size,
+                    DVec3::new(size, size, size) - half_size,
+                    DVec3::new(0.0, size, size) - half_size,
+                ];
+                // List of possible uv coordinates.
+                let uvs = [
+                    DVec2::new(0.0, 0.0),
+                    DVec2::new(1.0, 0.0),
+                    DVec2::new(0.0, 1.0),
+                    DVec2::new(1.0, 1.0),
+                ];
+                // Contains the indices of the triangle making up the mesh.
+                let mut triangles = Vec::<u32>::with_capacity(24);
+                // Fill in the vertices for each side.
+                                                                // +Z//0
+                vertices.push(Vertex::new(corners[3], uvs[0])); //0
+                vertices.push(Vertex::new(corners[2], uvs[1])); //1
+                vertices.push(Vertex::new(corners[6], uvs[3])); //2
+                vertices.push(Vertex::new(corners[7], uvs[2])); //3
+
+                // Fill up triangles indices
+                for i in 0..1 {
+                    // First triangle of each face.
+                    triangles.push(4 * i + 0);
+                    triangles.push(4 * i + 1);
+                    triangles.push(4 * i + 2);
+                    // Second triangle of each face.
+                    triangles.push(4 * i + 2);
+                    triangles.push(4 * i + 3);
+                    triangles.push(4 * i + 0);
+                }
+                Mesh::new(texture_id, vertices, triangles)
+            }
         }
     }
     /// Loads a mesh from a file.
@@ -202,6 +246,11 @@ impl MeshLoader {
 pub enum DefaultMesh {
     /// A default cube with 8 vertices, one at each apex.
     ///
-    /// - `f64` The size (in meters) of the cube's side.
+    /// - `f64` The size (in meters) of the cube's sides.
     Cube(f64),
+    /// A square face with 4 vertices, one at each apex.
+    /// Taken from the top (Z positive) face of the cube.
+    ///
+    /// - `f64` The size (in meters) of the face's sides.
+    SingleFace(f64),
 }

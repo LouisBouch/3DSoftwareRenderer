@@ -68,7 +68,7 @@ impl Mesh {
         self.update_transform();
     }
     /// Scales the mesh multiplicatively with the current scaling.
-    pub fn scale(&mut self, scale: DVec3) {
+    pub fn scale_mesh(&mut self, scale: DVec3) {
         self.scale *= scale;
         self.update_transform();
     }
@@ -130,6 +130,18 @@ impl Mesh {
         self.translation = translation;
         // Ensure the transformation matrix stays up to date.
         self.update_transform();
+    }
+    /// Gets the position of the mesh.
+    pub fn translation(&self) -> &DVec3 {
+        &self.translation
+    }
+    /// Gets the scale of the mesh.
+    pub fn scale(&self) -> &DVec3 {
+        &self.scale
+    }
+    /// Gets the quaternion of the mesh.
+    pub fn quat(&self) -> &DQuat {
+        &self.quat
     }
 }
 /// Contains the information required for a vertex of a triangle mesh.

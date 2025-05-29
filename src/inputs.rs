@@ -44,7 +44,7 @@ impl InputHandler {
             pressed_action: HashMap::new(),
             held_action: HashMap::new(),
             released_action: HashMap::new(),
-            sensitivity: 1.0,
+            sensitivity: 0.002,
             mouse_delta: None,
         };
         input_handler.setup_default_bindings();
@@ -226,8 +226,11 @@ impl InputHandler {
         self.held_action
             .insert(KeyCode::KeyS, Action::MoveBackwards);
         self.held_action.insert(KeyCode::KeyD, Action::MoveRight);
+        self.held_action.insert(KeyCode::KeyQ, Action::RotateCamera { pitch: 0.0, yaw: 0.0, roll: 0.1 });
+        self.held_action.insert(KeyCode::KeyE, Action::RotateCamera { pitch: 0.0, yaw: 0.0, roll: -0.1 });
         self.held_action.insert(KeyCode::Space, Action::MoveUp);
         self.held_action
             .insert(KeyCode::ControlLeft, Action::MoveDown);
+        // TODO: Add speed increase action with mouse wheel.
     }
 }

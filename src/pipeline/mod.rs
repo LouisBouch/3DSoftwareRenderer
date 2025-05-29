@@ -1,7 +1,5 @@
 //! Contains everytihng that will be needed to render the scene.
 
-use std::collections::HashMap;
-
 use geometry::Geometry;
 use glam::{DVec2, Vec3Swizzles, Vec4Swizzles};
 
@@ -28,6 +26,7 @@ impl Pipeline {
         let textures = scene.texture_catalog().textures();
         let camera = scene.camera();
         let projection = camera.projection();
+        let camera_inv_transform = camera.transform().inverse();
         // Handle the scene differently ddepending on projection method.
         match projection {
             crate::scene::camera::Projection::Perspective {
@@ -44,15 +43,15 @@ impl Pipeline {
                     let mut geometry = Geometry::from_mesh(mesh);
                     // Convert geometry to world coordinates.
                     geometry.lin_transform(mesh.transform());
-                    // Convert geometry to view space.
-                    geometry.lin_transform(camera.transform());
                     // Do backface culling.
                     geometry.cull_backface(&camera.position());
+                    // Convert geometry to view space.
+                    geometry.lin_transform(&camera_inv_transform);
                     // Convert to clip space.
                     geometry.lin_transform(&perspective_transform);
-                    geometry.set_clip_w_inv();
                     // Clip trianlges to view frustum.
                     geometry.clip_geometry();
+                    geometry.set_clip_w_inv();
                     // Convert to ndc space.
                     geometry.perspective_divide();
                     // Convert to screen space.
@@ -68,7 +67,6 @@ impl Pipeline {
                         None
                     };
                     self.rasterize(&geometry, screen, texture);
-                    //screen.draw() (do it somewhere else?)
                 }
             }
             crate::scene::camera::Projection::Orthographic { .. } => {
@@ -78,6 +76,8 @@ impl Pipeline {
     }
     /// Raterizes the geometry on the screen buffer.
     pub fn rasterize(&self, geometry: &Geometry, screen: &mut Screen, texture: Option<&Texture>) {
+        // TODO: Adjust rasterizing to prevent a missing line a of texture on the border of the
+        // screen. (Might be an issue in the clipping method).
         let vertices = geometry.vertices();
         let uvs = geometry.uvs();
         let w_invs = geometry.clip_w_inv();
@@ -144,16 +144,17 @@ impl Pipeline {
                     }
 
                     // Check if pixel is outside the triangle.
-                    if (alpha_xy < 0.0) && (beta_xy < 0.0) && (gamma_xy < 0.0) {
+                    if (alpha_xy < 0.0) || (beta_xy < 0.0) || (gamma_xy < 0.0) {
                         continue;
                     }
                     // Check if pixel closer to the screen has already been drawn.
                     // Smaller depth means closer to screen.
                     let depth = alpha_xy * a.z + beta_xy * b.z + gamma_xy * c.z;
                     let depth_buffer = screen.depth_buffer_mut();
-                    if depth as f32 >= depth_buffer[pixel_index as usize] {
+                    if depth as f64 >= depth_buffer[pixel_index as usize] {
                         continue;
                     }
+                    depth_buffer[pixel_index as usize] = depth as f64;
                     // Get the w inverse of the pixel (used for interpolation).
                     let w_inv = alpha_xy * w_inv_a + beta_xy * w_inv_b + gamma_xy * w_inv_c;
 
@@ -168,14 +169,14 @@ impl Pipeline {
                         Some(texture) => {
                             let mut pixel: [u8; 4] = [0, 0, 0, 255];
                             let slice = texture.from_uv(uv[0], uv[1]);
-                            pixel[..].copy_from_slice(&slice[0..nb_channels]);
+                            pixel[0..nb_channels].copy_from_slice(&slice[0..nb_channels]);
                             pixel
                         }
                         // Black if no texture.
                         None => [0, 0, 0, 255],
                     };
                     // Now draw it.
-                    frame[pixel_index as usize..pixel_index as usize + 4]
+                    frame[4 * pixel_index as usize..4 * (pixel_index as usize + 1)]
                         .copy_from_slice(&pixel_value);
                 }
                 // Update barycentric coordinates for next row.

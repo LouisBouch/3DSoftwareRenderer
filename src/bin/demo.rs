@@ -1,4 +1,4 @@
-use glam::DVec3;
+use glam::{DQuat, DVec3};
 // use glam::vec2;
 // use ndarray;
 // let a: ndarray::Array2<i32> = ndarray::Array2::from_shape_vec((2, 3), b).unwrap();
@@ -8,15 +8,24 @@ use glam::DVec3;
 use soft_rend::{
     app::App,
     resources::loaders::{DefaultMesh, DefaultTexture, MeshLoader, TextureLoader},
-    scene::Scene,
+    scene::{camera::Camera, Scene},
 };
 use winit::event_loop::EventLoop;
 fn main() -> Result<(), winit::error::EventLoopError> {
+    let (width, height) = (800, 600);
     // Create the event loop that will be used to manage window events.
     let event_loop = EventLoop::new().unwrap();
 
     // Create the scene that will be rendered.
-    let mut scene = Scene::new();
+    let camera = Camera::new_perspective(
+        &DVec3::ZERO,
+        &DQuat::IDENTITY,
+        10.0,
+        1000.0,
+        width as f32/height as f32,
+        90.0,
+    );
+    let mut scene = Scene::with_camera(camera);
 
     // Create a texture loader/mesh loaders to simplify the creation of textures and meshes.
     let tex_loader = TextureLoader::new();
@@ -24,7 +33,7 @@ fn main() -> Result<(), winit::error::EventLoopError> {
 
     // Populate the scene.
     let mut cube = mesh_loader.load_default_mesh(DefaultMesh::Cube(100.0), None);
-    cube.translate(DVec3::new(0.0, 0.0, -2.0));
+    cube.translate(DVec3::new(0.0, 0.0, -400.0));
     let checkered_id = scene
         .texture_catalog_mut()
         .add_texture(
@@ -39,7 +48,7 @@ fn main() -> Result<(), winit::error::EventLoopError> {
     scene.add_mesh(cube);
 
     // Create and start the app.
-    let mut app = App::new(800, 600, scene);
+    let mut app = App::new(width, height, scene);
     event_loop.run_app(&mut app)?;
     Ok(())
 }

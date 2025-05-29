@@ -17,7 +17,19 @@ impl Scene {
     /// Create new scene with default camera placement.
     pub fn new() -> Self {
         let camera = Camera::default();
-        Scene { camera, texture_catalog: TextureCatalog::new(), meshes: Vec::new() }
+        Scene {
+            camera,
+            texture_catalog: TextureCatalog::new(),
+            meshes: Vec::new(),
+        }
+    }
+    /// Create new scene with user defined camera.
+    pub fn with_camera(camera: Camera) -> Self {
+        Scene {
+            camera,
+            texture_catalog: TextureCatalog::new(),
+            meshes: Vec::new(),
+        }
     }
     /// Adds a mesh to the scene.
     pub fn add_mesh(&mut self, mesh: Mesh) {
@@ -53,4 +65,3 @@ impl Scene {
 }
 pub mod camera;
 mod light;
-
