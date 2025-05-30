@@ -10,3 +10,6 @@ winit = "0.30.10"   # To manage windows, keyboard and mouse.
 pixels = "0.15.0"   # To draw pixels on the screen.
 pollster = "0.4.0"  # To block on async functions (used to wait for pixels to initialzie).
 rayon = "1.10.0"    # Parallelism for CPU tasks.
+
+[profile.release]
+debug = true # Allows for debug symbols to show up for profiling.

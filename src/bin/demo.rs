@@ -22,7 +22,7 @@ fn main() -> Result<(), winit::error::EventLoopError> {
         &DQuat::IDENTITY,
         10.0,
         1000.0,
-        width as f32/height as f32,
+        width as f32 / height as f32,
         90.0,
     );
     let mut scene = Scene::with_camera(camera);
@@ -33,12 +33,16 @@ fn main() -> Result<(), winit::error::EventLoopError> {
 
     // Populate the scene.
     let mut cube = mesh_loader.load_default_mesh(DefaultMesh::Cube(100.0), None);
-    cube.translate(DVec3::new(0.0, 0.0, -400.0));
+    cube.translate(DVec3::new(0.0, 0.0, -70.0));
     let checkered_id = scene
         .texture_catalog_mut()
         .add_texture(
             String::from("Checkered"),
-            tex_loader.load_default_texture(DefaultTexture::Checkered(100)),
+            tex_loader.load_default_texture(DefaultTexture::Checkered {
+                width: 100,
+                height: 100,
+                nb_squares_width: 10,
+            }),
         )
         .unwrap_or_else(|e| {
             print!("The texture could not be added to the scene: {}", e);
@@ -49,6 +53,7 @@ fn main() -> Result<(), winit::error::EventLoopError> {
 
     // Create and start the app.
     let mut app = App::new(width, height, scene);
+    app.set_max_it(30);
     event_loop.run_app(&mut app)?;
     Ok(())
 }

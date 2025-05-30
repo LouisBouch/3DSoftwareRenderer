@@ -32,6 +32,9 @@ pub struct InputHandler {
     /// Change in mouse position since last time the inputs were checked.
     /// None if no changes.
     mouse_delta: Option<DVec2>,
+    /// Define the amount of times the mouse has been scrolled.
+    /// Positive means scroll up, negative means scroll down.
+    nb_scrolls: i32,
     // mouse_button_states: HashMap<KeyCode, InputState>,
     // 3 more hashmaps
 }
@@ -44,8 +47,9 @@ impl InputHandler {
             pressed_action: HashMap::new(),
             held_action: HashMap::new(),
             released_action: HashMap::new(),
-            sensitivity: 0.002,
+            sensitivity: 0.0005,
             mouse_delta: None,
+            nb_scrolls: 0,
         };
         input_handler.setup_default_bindings();
         input_handler
@@ -159,6 +163,9 @@ impl InputHandler {
             // Now that the action was prepared, reset the delta.
             self.mouse_delta = None;
         }
+        // Collect mouse scrolls.
+        actions.push(Action::AddCameraVelocity((100 * self.nb_scrolls) as f64));
+        self.nb_scrolls = 0;
         return actions;
     }
     /// Adds a key to the list after it is pressed.
@@ -171,8 +178,7 @@ impl InputHandler {
     pub fn press_key(&mut self, key_code: KeyCode) {
         if !self.key_states.contains_key(&key_code) {
             self.key_states.insert(key_code, InputState::Pressed);
-            println!("key {:?} was pressed", key_code);
-            // std::thread::sleep(time::Duration::from_millis(500));
+            // println!("key {:?} was pressed", key_code);
         }
     }
     /// Updates key to released state.
@@ -196,7 +202,7 @@ impl InputHandler {
             }
             _ => {}
         }
-        println!("key {:?} was released", key_code);
+        // println!("key {:?} was released", key_code);
     }
     /// Updates the mouse delta when the mouse is moved.
     ///
@@ -231,6 +237,11 @@ impl InputHandler {
         self.held_action.insert(KeyCode::Space, Action::MoveUp);
         self.held_action
             .insert(KeyCode::ControlLeft, Action::MoveDown);
-        // TODO: Add speed increase action with mouse wheel.
+        self.pressed_action.insert(KeyCode::Tab, Action::ToggleMouseCapture);
+    }
+    /// Define the amount of times the mouse has been scrolled.
+    /// Positive means scroll up, negative means scroll down.
+    pub fn add_nb_scrolls(&mut self, nb_scrolls: i32) {
+        self.nb_scrolls += nb_scrolls;
     }
 }

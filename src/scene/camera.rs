@@ -105,7 +105,6 @@ impl Camera {
         };
         c.update_transform();
         c
-
     }
     /// Gets an immutable reference to the position vector.
     ///
@@ -214,6 +213,12 @@ impl Camera {
         self.position += direction * dt * self.velocity;
         // Update transformation matrix to reflect the changes.
         self.update_transform();
+    }
+    /// Adds to the velocity of the camera.
+    ///
+    /// Positive values increase velocity, and negative value decrease it.
+    pub fn add_velocity(&mut self, velocity: f64) {
+        self.velocity = f64::max(0.0, self.velocity + velocity);
     }
 }
 // Getters and setters.

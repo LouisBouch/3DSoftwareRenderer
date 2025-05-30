@@ -26,4 +26,8 @@ pub enum Action {
         /// Change in roll/CW angle (Rads).
         roll: f64,
     },
+    /// Toggles the mouse capture.
+    ToggleMouseCapture,
+    /// Adds to the velocity of the camera.
+    AddCameraVelocity(f64),
 }

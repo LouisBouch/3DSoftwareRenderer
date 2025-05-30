@@ -33,15 +33,23 @@ impl TextureLoader {
     /// ```
     pub fn load_default_texture(&self, texture: DefaultTexture) -> Texture {
         match texture {
-            DefaultTexture::Checkered(size) => {
+            DefaultTexture::Checkered {
+                width,
+                height,
+                nb_squares_width,
+            } => {
                 let format_nb_channels: usize = 3;
                 let mut pixels =
-                    Vec::<u8>::with_capacity(size as usize * size as usize * format_nb_channels);
+                    Vec::<u8>::with_capacity(width as usize * height as usize * format_nb_channels);
+                let mut square_length = width / nb_squares_width;
+                if (width % nb_squares_width) != 0 {
+                    square_length += 1;
+                }
                 // Setup the pixel values for the texture.
-                for row in 0..size {
-                    for col in 0..size {
-                        let x_left = col < size / 2;
-                        let y_lower = row < size / 2;
+                for row in 0..height {
+                    for col in 0..width {
+                        let x_left = col % (2 * square_length) < square_length;
+                        let y_lower = row % (2 * square_length) < square_length;
                         // Check in which quadrant the pixel is being drawn. Decide on color based
                         // on that.
                         let color = if !(x_left ^ y_lower) { 255 } else { 0 };
@@ -53,9 +61,9 @@ impl TextureLoader {
                     }
                 }
                 // Finally, create the texture.
-                Texture::from_pixels(size, size, &pixels, Format::RGB24).unwrap_or_else(|e| {
+                Texture::from_pixels(width, height, &pixels, Format::RGB24).unwrap_or_else(|e| {
                     eprintln!("Could not create texture: {e}");
-                    Texture::new(size, size, Format::RGB24)
+                    Texture::new(width, height, Format::RGB24)
                 })
             }
         }
@@ -86,11 +94,15 @@ impl TextureLoader {
 /// A list of default textures that can be used to quickly get a texture.
 pub enum DefaultTexture {
     /// A black and white checkered texture.
-    ///
-    /// - `u32` The size (in pixels) of the texture's primitve, which is a 2x2 square of black and
-    /// white squares.
-    // TODO: Add option that dictates how many squares appear in a row of the checkered texture.
-    Checkered(u32),
+    Checkered {
+        /// The size (in pixels) of the texture's width.
+        width: u32,
+        /// The size (in pixels) of the texture's height.
+        height: u32,
+        /// Number of squares that appear along the width of the texture.
+        /// This will dictate their size and thus the number of square along the height.
+        nb_squares_width: u32,
+    },
 }
 
 /// Used to load default meshes, meshes from files or user defined meshes.
@@ -199,7 +211,7 @@ impl MeshLoader {
                 // Contains the indices of the triangle making up the mesh.
                 let mut triangles = Vec::<u32>::with_capacity(24);
                 // Fill in the vertices for each side.
-                                                                // +Z//0
+                // +Z//0
                 vertices.push(Vertex::new(corners[3], uvs[0])); //0
                 vertices.push(Vertex::new(corners[2], uvs[1])); //1
                 vertices.push(Vertex::new(corners[6], uvs[3])); //2

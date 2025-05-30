@@ -1,6 +1,7 @@
 //! Exposes the API that will be used to create an interactable window that can be drawn on.
 
 use std::time::{Duration, Instant};
+use std::u32;
 
 use crate::action::Action;
 use crate::pipeline::Pipeline;
@@ -9,7 +10,7 @@ use crate::{
     inputs,
     scene::{self, Scene},
 };
-use glam::DVec2;
+use glam::{bool, DVec2};
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, ElementState};
 use winit::event_loop::ControlFlow;
@@ -31,6 +32,12 @@ pub struct App {
     pipeline: Pipeline,
     /// The time at which the last frame started executing.
     last_frame_time: Instant,
+    /// Whether the mouse is captured within the app or not.
+    mouse_captured: bool,
+    /// Number of iterations before stopping the app (Mostly used for debuggin).
+    max_it: u64,
+    /// The current iteration number.
+    cur_it: u64,
 }
 impl App {
     /// Creates an app.
@@ -61,6 +68,9 @@ impl App {
             fps,
             pipeline,
             last_frame_time,
+            mouse_captured: false,
+            max_it: u64::MAX,
+            cur_it: 0,
         }
     }
     /// Creates an app.
@@ -85,31 +95,39 @@ impl App {
     /// These actions will include mouse movements too, whose magnitude will need to be queried.
     fn handle_actions(&mut self) {
         let actions = self.input_state.collect_actions();
-        let camera = self.scene.camera_mut();
         for action in actions.iter() {
             match action {
                 Action::MoveForwards => {
+                    let camera = self.scene.camera_mut();
                     camera.move_cam(1.0 / (self.fps as f64), scene::camera::Direction::Forwards);
                 }
                 Action::MoveBackwards => {
+                    let camera = self.scene.camera_mut();
                     camera.move_cam(1.0 / (self.fps as f64), scene::camera::Direction::Backwards);
                 }
                 Action::MoveLeft => {
+                    let camera = self.scene.camera_mut();
                     camera.move_cam(1.0 / (self.fps as f64), scene::camera::Direction::Left);
                 }
                 Action::MoveRight => {
+                    let camera = self.scene.camera_mut();
                     camera.move_cam(1.0 / (self.fps as f64), scene::camera::Direction::Right);
                 }
                 Action::MoveUp => {
+                    let camera = self.scene.camera_mut();
                     camera.move_cam(1.0 / (self.fps as f64), scene::camera::Direction::Up);
                 }
                 Action::MoveDown => {
+                    let camera = self.scene.camera_mut();
                     camera.move_cam(1.0 / (self.fps as f64), scene::camera::Direction::Down);
                 }
                 Action::RotateCamera { pitch, yaw, roll } => {
-                    camera.yaw(*yaw);
-                    camera.pitch(*pitch);
-                    camera.roll(*roll);
+                    if self.mouse_captured {
+                        let camera = self.scene.camera_mut();
+                        camera.yaw(*yaw);
+                        camera.pitch(*pitch);
+                        camera.roll(*roll);
+                    }
                     // // Rotate around world's y axis. Simulates FPS camera.
                     // let fixed_yaw_qat = DQuat::from_axis_angle(DVec3::Y, *yaw);
                     // camera.rotate(&fixed_yaw_qat);
@@ -118,12 +136,54 @@ impl App {
                     // let fixed_pitch_qat = DQuat::from_axis_angle(DVec3::X, *pitch);
                     // camera.rotate(&fixed_pitch_qat);
                 }
+                Action::ToggleMouseCapture => {
+                    self.capture_mouse(!self.mouse_captured);
+                }
+                Action::AddCameraVelocity(velocity) => {
+                    self.scene.camera_mut().add_velocity(*velocity);
+                }
             }
         }
     }
+    /// Captures or release the mouse from the app.
+    pub fn capture_mouse(&mut self, capture: bool) {
+        let winit_window = self.window.winit_window_mut();
+        // Capture mouse and make it invisible.
+        match winit_window {
+            Some(w) => {
+                if capture {
+                    w.set_cursor_visible(false);
+                    w.set_cursor_grab(winit::window::CursorGrabMode::Confined)
+                        .unwrap_or_else(|e| {
+                            eprintln!("Could not capture mouse: {e}");
+                            w.set_cursor_visible(true);
+                        });
+                } else {
+                    w.set_cursor_visible(true);
+                    w.set_cursor_grab(winit::window::CursorGrabMode::None)
+                        .unwrap_or_else(|e| {
+                            eprintln!("Could not release mouse: {e}");
+                        });
+                }
+            }
+            _ => {}
+        }
+        self.mouse_captured = capture;
+    }
+}
+// Getters/Setters
+impl App {
     /// Sets the frames per second of the software renderer.
     pub fn set_fps(&mut self, fps: u32) {
         self.fps = fps;
+    }
+    /// Getter for maximum number of iterations.
+    pub fn max_it(&self) -> u64 {
+        self.max_it
+    }
+    /// Setter for maximum number of iterations.
+    pub fn set_max_it(&mut self, max_it: u64) {
+        self.max_it = max_it;
     }
 }
 
@@ -189,27 +249,7 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::Focused(focused) => {
-                let winit_window = self.window.winit_window_mut();
-                // Capture mouse and make it invisible.
-                match winit_window {
-                    Some(w) => {
-                        if focused {
-                            w.set_cursor_visible(false);
-                            w.set_cursor_grab(winit::window::CursorGrabMode::Confined)
-                                .unwrap_or_else(|e| {
-                                    eprintln!("Could not capture mouse: {e}");
-                                    w.set_cursor_visible(true);
-                                });
-                        } else {
-                            w.set_cursor_visible(true);
-                            w.set_cursor_grab(winit::window::CursorGrabMode::None)
-                                .unwrap_or_else(|e| {
-                                    eprintln!("Could not release mouse: {e}");
-                                });
-                        }
-                    }
-                    _ => {}
-                }
+                self.capture_mouse(focused);
             }
 
             _ => {}
@@ -226,10 +266,27 @@ impl ApplicationHandler for App {
                 self.input_state
                     .mouse_move_raw(&DVec2::new(delta.0, delta.1));
             }
+            DeviceEvent::MouseWheel { delta } => match delta {
+                winit::event::MouseScrollDelta::LineDelta(_, row) => {
+                    if row < 0.0 {
+                        self.input_state.add_nb_scrolls(1);
+                    } else {
+                        self.input_state.add_nb_scrolls(-1);
+                    }
+                }
+                _ => {}
+            },
             _ => {}
         }
     }
     fn about_to_wait(&mut self, event_loop: &event_loop::ActiveEventLoop) {
+        // Check if we are at the last iteration.
+        if self.cur_it >= self.max_it {
+            event_loop.exit();
+            println!("Max iteration achieved, closing app.");
+        }
+        self.cur_it += 1;
+
         let next_frame_time =
             self.last_frame_time + Duration::new((1.0 / self.fps as f32) as u64, 0);
         // Handle actions.

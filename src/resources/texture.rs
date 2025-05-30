@@ -166,13 +166,14 @@ impl Texture {
     /// # Return
     ///
     /// A slice of the texture representing the pixel at the UV coordinates.
+    #[inline(always)]
     pub fn from_uv(&self, u: f64, v: f64) -> &[u8] {
         let nb_channels = match self.format {
             Format::RGBA32 => 4,
             Format::RGB24 => 3,
         };
         let x = ((u * self.width as f64).floor() as usize) % self.width as usize;
-        let y = ((v * self.height as f64).floor() as usize) % self.height() as usize;
+        let y = ((v * self.height as f64).floor() as usize) % self.height as usize;
         let index = (x + y * self.width as usize) * nb_channels;
         &self.pixels[index..index + nb_channels]
     }

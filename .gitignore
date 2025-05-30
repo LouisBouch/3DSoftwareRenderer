@@ -1,5 +1,9 @@
 /target
 
+# Files used for profiling.
+perf.data
+perf.data.old
+
 
 # Added by cargo
 #
