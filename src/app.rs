@@ -30,14 +30,18 @@ pub struct App {
     fps: u32,
     /// The pipeline that is used to transform the data into a rasterized image.
     pipeline: Pipeline,
-    /// The time at which the last frame started executing.
-    last_frame_time: Instant,
+    /// The time at which the next frame needs to render in order to hit the wanted fps.
+    next_frame_time: Instant,
     /// Whether the mouse is captured within the app or not.
     mouse_captured: bool,
     /// Number of iterations before stopping the app (Mostly used for debuggin).
     max_it: u64,
     /// The current iteration number.
     cur_it: u64,
+    /// Stores the last time the fps counter counted frames.
+    last_fps_count_time: Instant,
+    /// The number of frames that were rendered since the last fps count.
+    frame_count: u32,
 }
 impl App {
     /// Creates an app.
@@ -57,9 +61,12 @@ impl App {
         let window = Window::new(width, height);
         let input_state = inputs::InputHandler::new();
         let screen = Screen::new(width, height);
-        let fps = 100;
+        let fps = 50;
         let pipeline = Pipeline::new();
         let last_frame_time = Instant::now();
+        let last_fps_count = Instant::now();
+
+        let frame_count = 0;
         App {
             window,
             screen,
@@ -67,10 +74,12 @@ impl App {
             scene,
             fps,
             pipeline,
-            last_frame_time,
+            next_frame_time: last_frame_time,
             mouse_captured: false,
             max_it: u64::MAX,
             cur_it: 0,
+            last_fps_count_time: last_fps_count,
+            frame_count,
         }
     }
     /// Creates an app.
@@ -170,6 +179,28 @@ impl App {
         }
         self.mouse_captured = capture;
     }
+    /// Renders the screen and handles movement of the camera.
+    fn next_frame(&mut self) {
+        // Check fps count (at most once every second).
+        let now = Instant::now();
+        if self.last_fps_count_time + Duration::from_secs(1) <= now {
+            // Print fps count.
+            println!(
+                "fps: {}",
+                self.frame_count as f64 / (now - self.last_fps_count_time).as_secs_f64()
+            );
+            self.last_fps_count_time = now;
+            self.frame_count = 0;
+        }
+        // Handle actions.
+        self.handle_actions();
+        // Renders the screen into the pixel buffer.
+        self.pipeline.process_scene(&self.scene, &mut self.screen);
+        // self.screen.draw_texture(self.scene.texture_catalog().textures().get(&1).unwrap());
+
+        self.cur_it += 1;
+        self.frame_count += 1;
+    }
 }
 // Getters/Setters
 impl App {
@@ -224,15 +255,6 @@ impl ApplicationHandler for App {
 
                 // Render them.
                 pixels.render().unwrap();
-                // let frame = pixels.frame_mut();
-                // let pixel_index: u32;
-                // let camera_pos = self.scene.camera_mut().position();
-                // pixel_index =
-                //     (camera_pos.x * 4.0 - self.window.width() as f64 * 4.0 * camera_pos.y) as u32;
-                // frame[pixel_index as usize] = 255;
-                // frame[pixel_index as usize + 1] = 0;
-                // frame[pixel_index as usize + 2] = 255;
-                // frame[pixel_index as usize + 3] = 255;
 
                 // Reset screen.
                 self.screen.screen_clear();
@@ -285,22 +307,24 @@ impl ApplicationHandler for App {
             event_loop.exit();
             println!("Max iteration achieved, closing app.");
         }
-        self.cur_it += 1;
 
-        let next_frame_time =
-            self.last_frame_time + Duration::new((1.0 / self.fps as f32) as u64, 0);
-        // Handle actions.
-        self.handle_actions();
-        // Renders the screen into the pixel buffer.
-        self.pipeline.process_scene(&self.scene, &mut self.screen);
-        // self.screen.draw_texture(self.scene.texture_catalog().textures().get(&1).unwrap());
-        // Redraws the screen.
-        self.window
-            .winit_window_mut()
-            .expect("Window should be initialized")
-            .request_redraw();
+        // If enough time has passed, render a frame.
+        if Instant::now() >= self.next_frame_time {
+            // This value is set now instead of after next_frame to make sure
+            // slow frames don't get slowed down a further 1/fps seconds.
+            self.next_frame_time = Instant::now() + Duration::from_secs_f64(1.0 / self.fps as f64);
+
+            // Compute frame.
+            self.next_frame();
+
+            // Ask for next frame.
+            self.window
+                .winit_window_mut()
+                .expect("Window should be initialized")
+                .request_redraw();
+        }
 
         // Wait until next frame before rendering again.
-        event_loop.set_control_flow(ControlFlow::WaitUntil(next_frame_time));
+        event_loop.set_control_flow(ControlFlow::WaitUntil(self.next_frame_time));
     }
 }

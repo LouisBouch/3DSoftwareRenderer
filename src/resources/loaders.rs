@@ -119,7 +119,11 @@ impl MeshLoader {
     /// Loads a default mesh.
     pub fn load_default_mesh(&self, mesh: DefaultMesh, texture_id: Option<u32>) -> Mesh {
         match mesh {
-            DefaultMesh::Cube(size) => {
+            DefaultMesh::Cube {
+                size,
+                u_repeat,
+                v_repeat,
+            } => {
                 let half_size = size / 2.0;
                 let mut vertices = Vec::<Vertex>::with_capacity(8);
                 // List of possible corner positions.
@@ -136,12 +140,12 @@ impl MeshLoader {
                 // List of possible uv coordinates.
                 let uvs = [
                     DVec2::new(0.0, 0.0),
-                    DVec2::new(1.0, 0.0),
-                    DVec2::new(0.0, 1.0),
-                    DVec2::new(1.0, 1.0),
+                    DVec2::new(1.0 * u_repeat, 0.0),
+                    DVec2::new(0.0, 1.0 * v_repeat),
+                    DVec2::new(1.0 * u_repeat, 1.0 * v_repeat),
                 ];
                 // Contains the indices of the triangle making up the mesh.
-                let mut triangles = Vec::<u32>::with_capacity(24);
+                let mut triangles = Vec::<usize>::with_capacity(24);
                 // Fill in the vertices for each side.
                 // -X
                 vertices.push(Vertex::new(corners[4], uvs[0])); //0
@@ -209,7 +213,7 @@ impl MeshLoader {
                     DVec2::new(1.0, 1.0),
                 ];
                 // Contains the indices of the triangle making up the mesh.
-                let mut triangles = Vec::<u32>::with_capacity(24);
+                let mut triangles = Vec::<usize>::with_capacity(24);
                 // Fill in the vertices for each side.
                 // +Z//0
                 vertices.push(Vertex::new(corners[3], uvs[0])); //0
@@ -257,9 +261,14 @@ impl MeshLoader {
 /// A list of default patterns that can be used to quickly get a texture.
 pub enum DefaultMesh {
     /// A default cube with 8 vertices, one at each apex.
-    ///
-    /// - `f64` The size (in meters) of the cube's sides.
-    Cube(f64),
+    Cube {
+        /// The size (in meters) of the cube's sides.
+        size: f64,
+        /// The number of times the texture will be repeated in the u direction.
+        u_repeat: f64,
+        /// The number of times the texture will be repeated in the v direction.
+        v_repeat: f64,
+    },
     /// A square face with 4 vertices, one at each apex.
     /// Taken from the top (Z positive) face of the cube.
     ///

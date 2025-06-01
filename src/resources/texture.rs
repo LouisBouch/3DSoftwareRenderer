@@ -160,8 +160,8 @@ impl Texture {
     ///
     /// # Arguments
     ///
-    /// * `u` - U coordinate of the texture. Values above 1 will loop back to 0.
-    /// * `v` - V coordinate of the texture. Values above 1 will loop back to 0.
+    /// * `u` - U coordinate of the texture. Values must be between 0 and 1 (included).
+    /// * `v` - V coordinate of the texture. Values must be between 0 and 1 (included).
     ///
     /// # Return
     ///
@@ -172,8 +172,10 @@ impl Texture {
             Format::RGBA32 => 4,
             Format::RGB24 => 3,
         };
-        let x = ((u * self.width as f64).floor() as usize) % self.width as usize;
-        let y = ((v * self.height as f64).floor() as usize) % self.height as usize;
+        let x = ((u * self.width as f64) as usize) % self.width as usize;
+        let y = ((v * self.height as f64) as usize) % self.height as usize;
+        // let x = (u * self.width as f64) as usize;
+        // let y = (v * self.height as f64) as usize;
         let index = (x + y * self.width as usize) * nb_channels;
         &self.pixels[index..index + nb_channels]
     }

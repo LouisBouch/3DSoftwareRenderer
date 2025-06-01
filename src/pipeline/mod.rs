@@ -77,7 +77,9 @@ impl Pipeline {
     /// Raterizes the geometry on the screen buffer.
     pub fn rasterize(&self, geometry: &Geometry, screen: &mut Screen, texture: Option<&Texture>) {
         // TODO: Adjust rasterizing to prevent a missing line a of texture on the border of the
-        // screen. (Might be an issue in the clipping method).
+        // screen (might be an issue in the clipping method).
+        // TODO: Fix weird invisible diagonal line that goes from cornor to corner (might be an
+        // issue in the clipping method).
         let vertices = geometry.vertices();
         let uvs = geometry.uvs();
         let w_invs = geometry.clip_w_inv();
@@ -85,27 +87,36 @@ impl Pipeline {
         let (width, height) = (screen.width(), screen.height());
         // Get number of channels the texture format requries (0 if no texture).
         let nb_channels = if let Some(t) = texture {
-            t.nb_chanels() as usize
+            t.nb_chanels()
         } else {
             0
         };
 
         // Rasterize each triangle.
         for triangle_index_start in (0..triangles.len()).step_by(3) {
+            // Triangle vertex indices.
+            let (ai, bi, ci) = (
+                triangles[triangle_index_start],
+                triangles[triangle_index_start + 1],
+                triangles[triangle_index_start + 2],
+            );
+            // Triangle vertex position in space.
             let (a, b, c) = (
-                vertices[triangles[triangle_index_start as usize] as usize].xyz(),
-                vertices[triangles[triangle_index_start as usize + 1] as usize].xyz(),
-                vertices[triangles[triangle_index_start as usize + 2] as usize].xyz(),
+                vertices[ai].xyz(),
+                vertices[bi].xyz(),
+                vertices[ci].xyz(),
             );
+            // UV coordinates of each vertex.
             let (uv_a, uv_b, uv_c) = (
-                uvs[triangles[triangle_index_start as usize] as usize],
-                uvs[triangles[triangle_index_start as usize + 1] as usize],
-                uvs[triangles[triangle_index_start as usize + 2] as usize],
+                uvs[ai],
+                uvs[bi],
+                uvs[ci],
             );
+            // Inverted w from the homogeneous coordinates in clip space.
             let (w_inv_a, w_inv_b, w_inv_c) = (
-                w_invs[triangles[triangle_index_start as usize] as usize],
-                w_invs[triangles[triangle_index_start as usize + 1] as usize],
-                w_invs[triangles[triangle_index_start as usize + 2] as usize],
+                w_invs[ai],
+                w_invs[bi],
+                w_invs[ci],
             );
 
             // The barycentric coordinate gradients.
@@ -135,7 +146,7 @@ impl Pipeline {
                 // Initialize column bayrcentric coordinates.
                 let (mut alpha_xy, mut beta_xy, mut gamma_xy) = (alpha_0y, beta_0y, gamma_0y);
                 for x in min_x..max_x {
-                    let pixel_index = x + y * width;
+                    let pixel_index = (x + y * width) as usize;
                     // Update coordinates to next column.
                     if x != min_x {
                         alpha_xy += grad_alpha.x;
@@ -149,12 +160,12 @@ impl Pipeline {
                     }
                     // Check if pixel closer to the screen has already been drawn.
                     // Smaller depth means closer to screen.
-                    let depth = alpha_xy * a.z + beta_xy * b.z + gamma_xy * c.z;
                     let depth_buffer = screen.depth_buffer_mut();
-                    if depth as f64 >= depth_buffer[pixel_index as usize] {
+                    let depth = alpha_xy * a.z + beta_xy * b.z + gamma_xy * c.z;
+                    if depth >= depth_buffer[pixel_index] {
                         continue;
                     }
-                    depth_buffer[pixel_index as usize] = depth as f64;
+                    depth_buffer[pixel_index] = depth;
                     // Get the w inverse of the pixel (used for interpolation).
                     let w_inv = alpha_xy * w_inv_a + beta_xy * w_inv_b + gamma_xy * w_inv_c;
 
@@ -169,14 +180,14 @@ impl Pipeline {
                         Some(texture) => {
                             let mut pixel: [u8; 4] = [0, 0, 0, 255];
                             let slice = texture.from_uv(uv[0], uv[1]);
-                            pixel[0..nb_channels].copy_from_slice(&slice[0..nb_channels]);
+                            pixel[0..nb_channels as usize].copy_from_slice(&slice[0..nb_channels as usize]);
                             pixel
                         }
                         // Black if no texture.
                         None => [0, 0, 0, 255],
                     };
                     // Now draw it.
-                    frame[4 * pixel_index as usize..4 * (pixel_index as usize + 1)]
+                    frame[4 * pixel_index..4 * (pixel_index + 1)]
                         .copy_from_slice(&pixel_value);
                 }
                 // Update barycentric coordinates for next row.

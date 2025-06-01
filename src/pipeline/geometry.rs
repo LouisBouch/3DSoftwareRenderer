@@ -16,7 +16,7 @@ pub struct Geometry {
     uvs: Vec<DVec2>,
     /// The list of indices that define the triangles in the mesh. Each successive 3 idex represent
     /// a triangle. (Defined CCW)
-    triangles: Vec<u32>,
+    triangles: Vec<usize >,
     /// List of inverted w values from the homogeneous coordinates (in clip space before NDC conversion). Useful for interpolation in
     /// screen coordinates, as 1/w is linear in this space.
     clip_w_inv: Vec<f64>,
@@ -33,7 +33,7 @@ impl Geometry {
     pub fn new(
         vertices: &Vec<DVec4>,
         uvs: &Vec<DVec2>,
-        triangles: &Vec<u32>,
+        triangles: &Vec<usize>,
         texture_id: Option<u32>,
     ) -> Self {
         Geometry {
@@ -41,7 +41,7 @@ impl Geometry {
             vertices: vertices.clone(),
             uvs: uvs.clone(),
             triangles: triangles.clone(),
-            clip_w_inv: vec![1.0; vertices.len() as usize],
+            clip_w_inv: vec![1.0; vertices.len()],
         }
     }
     /// Constructs a new geometry from a mesh
@@ -89,7 +89,7 @@ impl Geometry {
     /// * `camera_position` - The camera position in world space.
     pub fn cull_backface(&mut self, camera_position: &DVec3) {
         // Create a new list of triangles which are facing towards the camera.
-        let mut triangles = Vec::<u32>::with_capacity(self.triangles.len());
+        let mut triangles = Vec::<usize>::with_capacity(self.triangles.len());
         // Check each triangle within the mesh and only keep those pointing towards the camera.
         for triangle_index_start in (0..self.triangles.len()).step_by(3) {
             // Get the vertex indices corresponding to the triangle.
@@ -100,9 +100,9 @@ impl Geometry {
             );
             // The three triangle vertices.
             let (a, b, c) = (
-                self.vertices[ai as usize].xyz(),
-                self.vertices[bi as usize].xyz(),
-                self.vertices[ci as usize].xyz(),
+                self.vertices[ai].xyz(),
+                self.vertices[bi].xyz(),
+                self.vertices[ci].xyz(),
             );
             // Vector from camera to first vertex of triangle.
             let cam_to_tri = a - camera_position;
@@ -123,7 +123,7 @@ impl Geometry {
     /// Uses the sutherland-hodgman polygon clipping algorithm.
     pub fn clip_geometry(&mut self) {
         // Create a new list of triangles that are created during the clipping, or survive it.
-        let mut triangles = Vec::<u32>::with_capacity(self.triangles.len());
+        let mut triangles = Vec::<usize>::with_capacity(self.triangles.len());
         // The various clipping plane defined for the frustum.
         #[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
         enum ClipPlane {
@@ -162,7 +162,7 @@ impl Geometry {
             (ClipPlane::ZN, DVec4::new(0.0, 0.0, -1.0, -1.0)),
         ];
         // A cache that remembers which planes intersected with which edges and at which point.
-        let mut intersection_cache: HashMap<(u32, u32, ClipPlane), u32> = HashMap::new();
+        let mut intersection_cache: HashMap<(usize, usize, ClipPlane), usize> = HashMap::new();
         for triangle_index_start in (0..self.triangles.len()).step_by(3) {
             // Get the vertex indices corresponding to the triangle. Make it the current shape.
             let mut shape = vec![
@@ -173,7 +173,7 @@ impl Geometry {
             // Clip the triangle against the 6 clipping planes (x=±w, y=±w, and z=±w).
             for (plane_type, plane_n) in hyperplanes.iter() {
                 // List of vertex indices making up the new shape after clipping.
-                let mut new_shape: Vec<u32> = Vec::new();
+                let mut new_shape: Vec<usize> = Vec::new();
                 // Check whether the edges straddle the plane.
                 for edge in 0..shape.len() {
                     let ai = shape[edge];
@@ -181,8 +181,8 @@ impl Geometry {
                     // let ai = shape[(edge + shape.len() - 1) % shape.len()];
                     // let bi = shape[edge];
                     // The vertex positions of the edge.
-                    let a = self.vertices[ai as usize];
-                    let b = self.vertices[bi as usize];
+                    let a = self.vertices[ai];
+                    let b = self.vertices[bi];
                     // Check whether a and b are inside or outside the plane.
                     let a_in = plane_n.dot(a) <= 0.0;
                     let b_in = plane_n.dot(b) <= 0.0;
@@ -219,11 +219,11 @@ impl Geometry {
                             let c = a.lerp(b, t);
                             self.vertices.push(c);
 
-                            let uv = self.uvs[ai as usize].lerp(self.uvs[bi as usize], t);
+                            let uv = self.uvs[ai].lerp(self.uvs[bi], t);
                             self.uvs.push(uv);
 
                             // And add it to the new shape.
-                            let ci = (self.vertices.len() - 1) as u32;
+                            let ci = self.vertices.len() - 1;
                             intersection_cache.insert((e1, e2, *plane_type), ci);
                             new_shape.push(ci);
                         }
@@ -277,11 +277,11 @@ impl Geometry {
         &self.uvs
     }
     /// Mutable reference to the triangles making up the mesh.
-    pub fn triangles_mut(&mut self) -> &mut Vec<u32> {
+    pub fn triangles_mut(&mut self) -> &mut Vec<usize> {
         &mut self.triangles
     }
     /// Reference to the triangles making up the mesh.
-    pub fn triangles(&self) -> &Vec<u32> {
+    pub fn triangles(&self) -> &Vec<usize> {
         &self.triangles
     }
     /// Mutable reference to the inverted w of the homogeneous coordinate of the vertices making up the mesh.

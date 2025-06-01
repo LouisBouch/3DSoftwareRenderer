@@ -164,7 +164,7 @@ impl InputHandler {
             self.mouse_delta = None;
         }
         // Collect mouse scrolls.
-        actions.push(Action::AddCameraVelocity((100 * self.nb_scrolls) as f64));
+        actions.push(Action::AddCameraVelocity((25 * self.nb_scrolls) as f64));
         self.nb_scrolls = 0;
         return actions;
     }

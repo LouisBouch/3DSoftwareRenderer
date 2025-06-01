@@ -17,7 +17,7 @@ pub struct Mesh {
     local_vertices: Vec<Vertex>,
     /// The list of indices that define the triangles in the mesh. Each successive 3 idex represent
     /// a triangle.
-    triangles: Vec<u32>,
+    triangles: Vec<usize>,
 }
 impl Mesh {
     /// Creates a new [`Mesh`].
@@ -36,7 +36,7 @@ impl Mesh {
     /// No verifications are made to ensure validity of the uv
     /// coordinates, position of the vertices and indices of the triangles.
     /// It is up to the user to ensure it.
-    pub fn new(texture_id: Option<u32>, vertices: Vec<Vertex>, triangles: Vec<u32>) -> Self {
+    pub fn new(texture_id: Option<u32>, vertices: Vec<Vertex>, triangles: Vec<usize>) -> Self {
         Mesh {
             texture_id,
             world_transfrom: DMat4::IDENTITY,
@@ -102,7 +102,7 @@ impl Mesh {
         &self.local_vertices
     }
     /// Exposes a reference to the list of triangles making up the mesh.
-    pub fn triangles(&self) -> &Vec<u32> {
+    pub fn triangles(&self) -> &Vec<usize> {
         &self.triangles
     }
     /// Exposes a reference to the transform which converts the mesh from local to world space.

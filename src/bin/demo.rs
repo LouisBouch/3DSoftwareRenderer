@@ -20,7 +20,7 @@ fn main() -> Result<(), winit::error::EventLoopError> {
     let camera = Camera::new_perspective(
         &DVec3::ZERO,
         &DQuat::IDENTITY,
-        10.0,
+        5.0,
         1000.0,
         width as f32 / height as f32,
         90.0,
@@ -32,16 +32,23 @@ fn main() -> Result<(), winit::error::EventLoopError> {
     let mesh_loader = MeshLoader::new();
 
     // Populate the scene.
-    let mut cube = mesh_loader.load_default_mesh(DefaultMesh::Cube(100.0), None);
+    let mut cube = mesh_loader.load_default_mesh(
+        DefaultMesh::Cube {
+            size: 100.0,
+            u_repeat: 5.0,
+            v_repeat: 5.0,
+        },
+        None,
+    );
     cube.translate(DVec3::new(0.0, 0.0, -70.0));
     let checkered_id = scene
         .texture_catalog_mut()
         .add_texture(
             String::from("Checkered"),
             tex_loader.load_default_texture(DefaultTexture::Checkered {
-                width: 100,
-                height: 100,
-                nb_squares_width: 10,
+                width: 20,
+                height: 20,
+                nb_squares_width: 2,
             }),
         )
         .unwrap_or_else(|e| {
@@ -53,7 +60,7 @@ fn main() -> Result<(), winit::error::EventLoopError> {
 
     // Create and start the app.
     let mut app = App::new(width, height, scene);
-    app.set_max_it(30);
+    // app.set_max_it(30);
     event_loop.run_app(&mut app)?;
     Ok(())
 }
