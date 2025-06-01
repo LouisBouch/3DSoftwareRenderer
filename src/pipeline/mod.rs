@@ -133,7 +133,8 @@ impl Pipeline {
             let max_y = if max_y > height { height } else { max_y };
 
             // Get barycentric coordinates at screen pos (min_x, min_y).
-            let min_pos = DVec2::new(min_x as f64, min_y as f64);
+            // Add 0.5 to both x and y in order to sample the pixel at its center.
+            let min_pos = DVec2::new(min_x as f64 + 0.5, min_y as f64 + 0.5);
             let (alpha_00, beta_00, gamma_00) = (
                 grad_alpha.dot(min_pos - c.xy()),
                 grad_beta.dot(min_pos - a.xy()),
