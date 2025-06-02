@@ -61,7 +61,7 @@ impl App {
         let window = Window::new(width, height);
         let input_state = inputs::InputHandler::new();
         let screen = Screen::new(width, height);
-        let fps = 1005;
+        let fps = 60;
         let pipeline = Pipeline::new();
         let last_frame_time = Instant::now();
         let last_fps_count = Instant::now();

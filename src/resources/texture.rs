@@ -167,7 +167,6 @@ impl Texture {
     ///
     /// A slice of the texture representing the pixel at the UV coordinates.
     #[inline(always)]
-    // pub fn from_uv(&self, u: f64, v: f64) -> u32 {
     pub fn from_uv(&self, u: f64, v: f64) -> &[u8] {
         // Handles the wrapping.
         let (u_fraction, v_fraction) = (u - u.trunc(), v - v.trunc());
@@ -185,18 +184,6 @@ impl Texture {
 
         let index = (x + y * self.width) * nb_channels;
         &self.pixels[index..index + nb_channels]
-        // Alternative for u8 to u32 conversion.
-        // u32::from_be_bytes([
-        //     self.pixels[index],
-        //     self.pixels[index + 1],
-        //     self.pixels[index + 2],
-        //     if nb_channels == 4 {
-        //         self.pixels[index + 3]
-        //     } else {
-        //         255
-        //     },
-        // ]
-        // )
     }
     /// Obtains the number of channels the format requires.
     pub fn nb_chanels(&self) -> u32 {
