@@ -9,9 +9,9 @@ use winit::window;
 /// Contains the necessary information to move and create a window.
 pub struct Window {
     /// Width of the window.
-    width: u32,
+    width: usize,
     /// Height of the window.
-    height: u32,
+    height: usize,
     /// Shared instance of the winit window.
     winit_window: Option<Arc<window::Window>>,
 }
@@ -29,7 +29,7 @@ impl Window {
     /// # Returns
     ///
     /// The instantiated Window.
-    pub fn new(width: u32, height: u32) -> Window {
+    pub fn new(width: usize, height: usize) -> Window {
         Window {
             width: width,
             height: height,
@@ -61,11 +61,11 @@ impl Window {
         Ok(())
     }
     /// Getter for the width.
-    pub fn width(&self) -> u32{
+    pub fn width(&self) -> usize{
         self.width
     }
     /// getter for the height.
-    pub fn height(&self) -> u32{
+    pub fn height(&self) -> usize{
         self.height
     }
     /// Mutable getter for the winit window.

@@ -76,18 +76,16 @@ impl Pipeline {
     }
     /// Raterizes the geometry on the screen buffer.
     pub fn rasterize(&self, geometry: &Geometry, screen: &mut Screen, texture: Option<&Texture>) {
-        // TODO: Adjust rasterizing to prevent a missing line a of texture on the border of the
-        // screen (might be an issue in the clipping method).
-        // TODO: Fix weird invisible diagonal line that goes from cornor to corner (might be an
-        // issue in the clipping method).
+        // TODO: Use f32 instead of f64 for performance?
         let vertices = geometry.vertices();
         let uvs = geometry.uvs();
         let w_invs = geometry.clip_w_inv();
         let triangles = geometry.triangles();
         let (width, height) = (screen.width(), screen.height());
+        let (frame, depth_buffer) = screen.buffers_mut();
         // Get number of channels the texture format requries (0 if no texture).
         let nb_channels = if let Some(t) = texture {
-            t.nb_chanels()
+            t.nb_chanels() as usize
         } else {
             0
         };
@@ -101,27 +99,21 @@ impl Pipeline {
                 triangles[triangle_index_start + 2],
             );
             // Triangle vertex position in space.
-            let (a, b, c) = (
-                vertices[ai].xyz(),
-                vertices[bi].xyz(),
-                vertices[ci].xyz(),
-            );
+            let (a, b, c) = (vertices[ai].xyz(), vertices[bi].xyz(), vertices[ci].xyz());
             // UV coordinates of each vertex.
-            let (uv_a, uv_b, uv_c) = (
-                uvs[ai],
-                uvs[bi],
-                uvs[ci],
-            );
+            let (uv_a, uv_b, uv_c) = (uvs[ai], uvs[bi], uvs[ci]);
             // Inverted w from the homogeneous coordinates in clip space.
-            let (w_inv_a, w_inv_b, w_inv_c) = (
-                w_invs[ai],
-                w_invs[bi],
-                w_invs[ci],
-            );
+            let (w_inv_a, w_inv_b, w_inv_c) = (w_invs[ai], w_invs[bi], w_invs[ci]);
 
             // The barycentric coordinate gradients.
-            let (grad_alpha, grad_beta, grad_gamma) =
+            let (alpha_grad, beta_grad, gamma_grad) =
                 algorithm::barycentric_gradients2(a.xy(), b.xy(), c.xy());
+            // Initialize the important values' derivative.
+            let depth_dx = alpha_grad.x * a.z + beta_grad.x * b.z + gamma_grad.x * c.z;
+            let w_inv_dx = alpha_grad.x * w_inv_a + beta_grad.x * w_inv_b + gamma_grad.x * w_inv_c; // Used for interpolation.
+            let uv_nominator_dx = alpha_grad.x * uv_a * w_inv_a
+                + beta_grad.x * uv_b * w_inv_b
+                + gamma_grad.x * uv_c * w_inv_c;
 
             // Get bounding box of triangle.
             // max values are excluded, while min values are included.
@@ -136,65 +128,85 @@ impl Pipeline {
             // Add 0.5 to both x and y in order to sample the pixel at its center.
             let min_pos = DVec2::new(min_x as f64 + 0.5, min_y as f64 + 0.5);
             let (alpha_00, beta_00, gamma_00) = (
-                grad_alpha.dot(min_pos - c.xy()),
-                grad_beta.dot(min_pos - a.xy()),
-                grad_gamma.dot(min_pos - b.xy()),
+                alpha_grad.dot(min_pos - c.xy()),
+                beta_grad.dot(min_pos - a.xy()),
+                gamma_grad.dot(min_pos - b.xy()),
             );
             // Initialize coordinates for first row (redundant, but clearer)
             let (mut alpha_0y, mut beta_0y, mut gamma_0y) = (alpha_00, beta_00, gamma_00);
             // Rasterize over the bounding box.
             for y in min_y..max_y {
-                // Initialize column bayrcentric coordinates.
+                let mut pixel_index = (min_x + y * width) as usize;
+                // Initialize column bayrcentric coordinates and other important values.
                 let (mut alpha_xy, mut beta_xy, mut gamma_xy) = (alpha_0y, beta_0y, gamma_0y);
-                for x in min_x..max_x {
-                    let pixel_index = (x + y * width) as usize;
-                    // Update coordinates to next column.
-                    if x != min_x {
-                        alpha_xy += grad_alpha.x;
-                        beta_xy += grad_beta.x;
-                        gamma_xy += grad_gamma.x;
-                    }
-
+                let mut depth = alpha_xy * a.z + beta_xy * b.z + gamma_xy * c.z;
+                let mut w_inv = alpha_xy * w_inv_a + beta_xy * w_inv_b + gamma_xy * w_inv_c;
+                let mut uv_nominator = alpha_xy * uv_a * w_inv_a
+                    + beta_xy * uv_b * w_inv_b
+                    + gamma_xy * uv_c * w_inv_c;
+                for _ in min_x..max_x {
                     // Check if pixel is outside the triangle.
-                    if (alpha_xy < 0.0) || (beta_xy < 0.0) || (gamma_xy < 0.0) {
-                        continue;
-                    }
-                    // Check if pixel closer to the screen has already been drawn.
-                    // Smaller depth means closer to screen.
-                    let depth_buffer = screen.depth_buffer_mut();
-                    let depth = alpha_xy * a.z + beta_xy * b.z + gamma_xy * c.z;
-                    if depth >= depth_buffer[pixel_index] {
-                        continue;
-                    }
-                    depth_buffer[pixel_index] = depth;
-                    // Get the w inverse of the pixel (used for interpolation).
-                    let w_inv = alpha_xy * w_inv_a + beta_xy * w_inv_b + gamma_xy * w_inv_c;
+                    if (alpha_xy >= 0.0) & (beta_xy >= 0.0) & (gamma_xy >= 0.0) {
+                        // Check if pixel closer to the screen has already been drawn.
+                        // Smaller depth means closer to screen.
+                        if depth < depth_buffer[pixel_index] {
+                            depth_buffer[pixel_index] = depth;
 
-                    // Get the UV coordinates of the pixel.
-                    let uv = (alpha_xy * uv_a * w_inv_a
-                        + beta_xy * uv_b * w_inv_b
-                        + gamma_xy * uv_c * w_inv_c)
-                        / w_inv;
-                    // Given the UV coordinates, get the texture color.
-                    let frame = screen.pixels_mut().unwrap().frame_mut();
-                    let pixel_value: [u8; 4] = match texture {
-                        Some(texture) => {
-                            let mut pixel: [u8; 4] = [0, 0, 0, 255];
-                            let slice = texture.from_uv(uv[0], uv[1]);
-                            pixel[0..nb_channels as usize].copy_from_slice(&slice[0..nb_channels as usize]);
-                            pixel
+                            // Get the UV coordinates of the pixel.
+                            let uv = uv_nominator / w_inv;
+
+                            // Given the UV coordinates, get the texture color and draw it.
+                            let pixel_channel_index = 4 * pixel_index;
+                            match texture {
+                                Some(texture) => {
+                                    let slice = texture.from_uv(uv[0], uv[1]);
+                                    unsafe {
+                                        std::ptr::copy_nonoverlapping(
+                                            slice.as_ptr(),
+                                            frame.as_mut_ptr().add(pixel_channel_index),
+                                            3,
+                                        );
+                                    }
+                                    if nb_channels != 4 {
+                                        frame[pixel_channel_index + 3] = 255;
+                                    }
+                                    // Alternative unsafe code using u32 color.
+                                    // unsafe {
+                                    //     let frame_u32: &mut[u32] =std::slice::from_raw_parts_mut(frame.as_mut_ptr() as *mut u32, frame.len()/4);
+                                    //     frame_u32[pixel_index] = slice;
+                                    // }
+                                    // Alternative safe code.
+                                    // frame[pixel_channel_index] = slice[0];
+                                    // frame[pixel_channel_index + 1] = slice[1];
+                                    // frame[pixel_channel_index + 2] = slice[2];
+                                    // // Write alpha channel if texture has one.
+                                    // frame[pixel_channel_index + 3] =
+                                    //     if nb_channels == 4 { slice[3] } else { 255 };
+                                }
+                                // Black if no texture.
+                                None => {
+                                    frame[pixel_channel_index..pixel_channel_index + 4]
+                                        .copy_from_slice(&[0, 0, 0, 255]);
+                                }
+                            };
                         }
-                        // Black if no texture.
-                        None => [0, 0, 0, 255],
-                    };
-                    // Now draw it.
-                    frame[4 * pixel_index..4 * (pixel_index + 1)]
-                        .copy_from_slice(&pixel_value);
+                    }
+                    // Update barycentric coordinates for next horizontal pixel.
+                    alpha_xy += alpha_grad.x;
+                    beta_xy += beta_grad.x;
+                    gamma_xy += gamma_grad.x;
+
+                    // Update important values with derivative for next horizontal pixel.
+                    depth += depth_dx;
+                    w_inv += w_inv_dx;
+                    uv_nominator += uv_nominator_dx;
+
+                    pixel_index += 1;
                 }
                 // Update barycentric coordinates for next row.
-                alpha_0y += grad_alpha.y;
-                beta_0y += grad_beta.y;
-                gamma_0y += grad_gamma.y;
+                alpha_0y += alpha_grad.y;
+                beta_0y += beta_grad.y;
+                gamma_0y += gamma_grad.y;
             }
         }
     }
@@ -205,7 +217,7 @@ impl Pipeline {
     /// The maximum and minimum values of x and y of the bounding square
     /// in the following format:
     /// (min_x, max_x, min_y, max_y)
-    fn triangle_aabs(a: DVec2, b: DVec2, c: DVec2) -> (u32, u32, u32, u32) {
+    fn triangle_aabs(a: DVec2, b: DVec2, c: DVec2) -> (usize, usize, usize, usize) {
         let mut min_x = a.x.min(b.x).min(c.x).floor();
         let mut max_x = a.x.max(b.x).max(c.x).ceil();
         let mut min_y = a.y.min(b.y).min(c.y).floor();
@@ -214,6 +226,11 @@ impl Pipeline {
         max_x = if max_x < 0.0 { 0.0 } else { max_x };
         min_y = if min_y < 0.0 { 0.0 } else { min_y };
         max_y = if max_y < 0.0 { 0.0 } else { max_y };
-        (min_x as u32, max_x as u32, min_y as u32, max_y as u32)
+        (
+            min_x as usize,
+            max_x as usize,
+            min_y as usize,
+            max_y as usize,
+        )
     }
 }

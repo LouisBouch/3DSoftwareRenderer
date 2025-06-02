@@ -69,3 +69,19 @@ pub fn barycentric_gradients2(a: DVec2, b: DVec2, c: DVec2) -> (DVec2, DVec2, DV
 
     (u_alpha, u_beta, u_gamma)
 }
+#[inline(always)]
+/// Converts four 8bit numbers into a single u32. (Use u32::from_be_bytes instead)
+///
+/// # Arguments
+///
+/// * `b1` - The first 8 bits (starting from the left).
+/// * `b2` - The next 8 bits.
+/// * `b3` - The next next 8 bits.
+/// * `b4` - The last 8 bits.
+///
+/// # Return
+///
+/// The u32 made from the four 8bit numbers (b1b2b3b4).
+pub fn u8s_to_u32(b1: u8, b2: u8, b3: u8, b4: u8) -> u32 {
+    (b1 as u32) << 24 | (b2 as u32) << 16 | (b3 as u32) << 8 | (b4 as u32)
+}

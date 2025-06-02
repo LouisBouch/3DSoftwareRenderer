@@ -59,7 +59,7 @@ impl Scene {
         &mut self.meshes
     }
     /// Reference for the mesh vector.
-    pub fn meshes(&self) -> &Vec<Mesh> {
+    pub fn meshes(&self) -> &[Mesh] {
         &self.meshes
     }
 }

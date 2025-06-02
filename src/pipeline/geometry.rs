@@ -16,7 +16,7 @@ pub struct Geometry {
     uvs: Vec<DVec2>,
     /// The list of indices that define the triangles in the mesh. Each successive 3 idex represent
     /// a triangle. (Defined CCW)
-    triangles: Vec<usize >,
+    triangles: Vec<usize>,
     /// List of inverted w values from the homogeneous coordinates (in clip space before NDC conversion). Useful for interpolation in
     /// screen coordinates, as 1/w is linear in this space.
     clip_w_inv: Vec<f64>,
@@ -261,33 +261,33 @@ impl Geometry {
 // Getters and setters
 impl Geometry {
     /// Mutable reference to the positions of the vertices making up the mesh.
-    pub fn vertices_mut(&mut self) -> &mut Vec<DVec4> {
+    pub fn vertices_mut(&mut self) -> &mut [DVec4] {
         &mut self.vertices
     }
     /// Reference to the positions of the vertices making up the mesh.
-    pub fn vertices(&self) -> &Vec<DVec4> {
+    pub fn vertices(&self) -> &[DVec4] {
         &self.vertices
     }
     /// Mutable reference to the uv coordinates of the vertices making up the mesh.
-    pub fn uvs_mut(&mut self) -> &mut Vec<DVec2> {
+    pub fn uvs_mut(&mut self) -> &mut [DVec2] {
         &mut self.uvs
     }
     /// Reference to the uv coordinates of the vertices making up the mesh.
-    pub fn uvs(&self) -> &Vec<DVec2> {
+    pub fn uvs(&self) -> &[DVec2] {
         &self.uvs
     }
     /// Mutable reference to the triangles making up the mesh.
-    pub fn triangles_mut(&mut self) -> &mut Vec<usize> {
+    pub fn triangles_mut(&mut self) -> &mut [usize] {
         &mut self.triangles
     }
     /// Reference to the triangles making up the mesh.
-    pub fn triangles(&self) -> &Vec<usize> {
+    pub fn triangles(&self) -> &[usize] {
         &self.triangles
     }
     /// Mutable reference to the inverted w of the homogeneous coordinate of the vertices making up the mesh.
     ///
     /// This value is used when linearly interpolating coordinates in screen space.
-    pub fn clip_w_inv_mut(&mut self) -> &mut Vec<f64> {
+    pub fn clip_w_inv_mut(&mut self) -> &mut [f64] {
         &mut self.clip_w_inv
     }
     /// Reference to the inverted w of the homogeneous coordinate of the vertices making up the mesh.

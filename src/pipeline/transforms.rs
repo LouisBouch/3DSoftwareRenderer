@@ -4,7 +4,7 @@ use glam::{DMat4, DVec4};
 
 /// Given the [`height`] and [`width`] of the screen, create a transform that convert from ndc to
 /// screen coordinates.
-pub fn ndc_to_screen_transform(width: u32, height: u32) -> DMat4 {
+pub fn ndc_to_screen_transform(width: usize, height: usize) -> DMat4 {
     let half_width: f64 = width as f64 / 2.0;
     let half_height: f64 = height as f64 / 2.0;
     DMat4::from_cols(

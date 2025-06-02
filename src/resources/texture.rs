@@ -81,9 +81,9 @@ pub struct Texture {
     /// The RGB/A pixel values for every pixels. Left to right, top to bottom.
     pixels: Vec<u8>,
     /// Number of pixels horizontally.
-    width: u32,
+    width: usize,
     /// Number of pixels vertically.
-    height: u32,
+    height: usize,
     /// Pixel format of the texture.
     format: Format,
 }
@@ -99,19 +99,19 @@ impl Texture {
     /// # Return
     ///
     /// The new instance created through the function.
-    pub fn new(width: u32, height: u32, format: Format) -> Self {
+    pub fn new(width: usize, height: usize, format: Format) -> Self {
         match format {
             Format::RGBA32 => {
                 let pixel = [0, 0, 0, 255];
                 Texture {
-                    pixels: pixel.repeat(width as usize * height as usize),
+                    pixels: pixel.repeat(width * height),
                     width,
                     height,
                     format,
                 }
             }
             Format::RGB24 => Texture {
-                pixels: vec![0; 3 * width as usize * height as usize],
+                pixels: vec![0; 3 * width * height],
                 width,
                 height,
                 format,
@@ -131,8 +131,8 @@ impl Texture {
     ///
     /// The new instance created through the function.
     pub fn from_pixels(
-        width: u32,
-        height: u32,
+        width: usize,
+        height: usize,
         pixels: &Vec<u8>,
         format: Format,
     ) -> Result<Self, TextureError> {
@@ -143,10 +143,10 @@ impl Texture {
         };
         // Check if pixels has correct size given width, height
         // and the number of channels.
-        if width * height * format_channels != pixels.len() as u32 {
+        if width * height * format_channels != pixels.len() {
             return Err(TextureError::MismatchedPixelDataSize {
                 expected: width * height * format_channels,
-                actual: pixels.len() as u32,
+                actual: pixels.len(),
             });
         }
         Ok(Texture {
@@ -167,17 +167,36 @@ impl Texture {
     ///
     /// A slice of the texture representing the pixel at the UV coordinates.
     #[inline(always)]
+    // pub fn from_uv(&self, u: f64, v: f64) -> u32 {
     pub fn from_uv(&self, u: f64, v: f64) -> &[u8] {
+        // Handles the wrapping.
+        let (u_fraction, v_fraction) = (u - u.trunc(), v - v.trunc());
         let nb_channels = match self.format {
             Format::RGBA32 => 4,
             Format::RGB24 => 3,
         };
-        let x = ((u * self.width as f64) as usize) % self.width as usize;
-        let y = ((v * self.height as f64) as usize) % self.height as usize;
-        // let x = (u * self.width as f64) as usize;
-        // let y = (v * self.height as f64) as usize;
-        let index = (x + y * self.width as usize) * nb_channels;
+
+        let mut x = (u_fraction * self.width as f64) as usize;
+        let mut y = (v_fraction * self.height as f64) as usize;
+
+        // Necessary in case u,v~1, in which case x,y would cause out of bounds error.
+        x = x.min(self.width - 1);
+        y = y.min(self.height - 1);
+
+        let index = (x + y * self.width) * nb_channels;
         &self.pixels[index..index + nb_channels]
+        // Alternative for u8 to u32 conversion.
+        // u32::from_be_bytes([
+        //     self.pixels[index],
+        //     self.pixels[index + 1],
+        //     self.pixels[index + 2],
+        //     if nb_channels == 4 {
+        //         self.pixels[index + 3]
+        //     } else {
+        //         255
+        //     },
+        // ]
+        // )
     }
     /// Obtains the number of channels the format requires.
     pub fn nb_chanels(&self) -> u32 {
@@ -194,11 +213,11 @@ impl Texture {
         &self.pixels
     }
     /// Obtains the width of the texture.
-    pub fn width(&self) -> u32 {
+    pub fn width(&self) -> usize {
         self.width
     }
     /// Obtains the height of the texture.
-    pub fn height(&self) -> u32 {
+    pub fn height(&self) -> usize {
         self.height
     }
     /// Obtains the format of the texture.
@@ -221,9 +240,9 @@ pub enum TextureError {
     /// are incompatible with the pixel data received.
     MismatchedPixelDataSize {
         /// Expected length of the pixels vector.
-        expected: u32,
+        expected: usize,
         /// Actual length of the pixels array.
-        actual: u32,
+        actual: usize,
     },
     /// Used when the user tries to add a texture that already exists in the catalog.
     TextureNameAlreadyExists {

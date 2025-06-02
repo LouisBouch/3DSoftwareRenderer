@@ -40,7 +40,7 @@ impl TextureLoader {
             } => {
                 let format_nb_channels: usize = 3;
                 let mut pixels =
-                    Vec::<u8>::with_capacity(width as usize * height as usize * format_nb_channels);
+                    Vec::<u8>::with_capacity(width * height * format_nb_channels);
                 let mut square_length = width / nb_squares_width;
                 if (width % nb_squares_width) != 0 {
                     square_length += 1;
@@ -96,12 +96,12 @@ pub enum DefaultTexture {
     /// A black and white checkered texture.
     Checkered {
         /// The size (in pixels) of the texture's width.
-        width: u32,
+        width: usize,
         /// The size (in pixels) of the texture's height.
-        height: u32,
+        height: usize,
         /// Number of squares that appear along the width of the texture.
         /// This will dictate their size and thus the number of square along the height.
-        nb_squares_width: u32,
+        nb_squares_width: usize,
     },
 }
 

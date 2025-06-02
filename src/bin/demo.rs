@@ -46,8 +46,8 @@ fn main() -> Result<(), winit::error::EventLoopError> {
         .add_texture(
             String::from("Checkered"),
             tex_loader.load_default_texture(DefaultTexture::Checkered {
-                width: 20,
-                height: 20,
+                width: 2,
+                height: 2,
                 nb_squares_width: 2,
             }),
         )

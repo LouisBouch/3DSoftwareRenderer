@@ -57,11 +57,11 @@ impl App {
     /// # Returns
     ///
     /// The instantiated App.
-    pub fn new(width: u32, height: u32, scene: Scene) -> Self {
+    pub fn new(width: usize, height: usize, scene: Scene) -> Self {
         let window = Window::new(width, height);
         let input_state = inputs::InputHandler::new();
         let screen = Screen::new(width, height);
-        let fps = 50;
+        let fps = 1005;
         let pipeline = Pipeline::new();
         let last_frame_time = Instant::now();
         let last_fps_count = Instant::now();
@@ -94,7 +94,7 @@ impl App {
     /// # Returns
     ///
     /// The instantiated App.
-    pub fn with_default_scene(width: u32, height: u32) -> Self {
+    pub fn with_default_scene(width: usize, height: usize) -> Self {
         let scene = Scene::new();
         Self::new(width, height, scene)
     }
