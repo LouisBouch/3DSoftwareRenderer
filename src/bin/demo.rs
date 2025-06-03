@@ -8,7 +8,7 @@ use glam::{DQuat, DVec3};
 use soft_rend::{
     app::App,
     resources::loaders::{DefaultMesh, DefaultTexture, MeshLoader, TextureLoader},
-    scene::{camera::Camera, Scene},
+    scene::{camera::{Camera, CameraStyle}, Scene},
 };
 use winit::event_loop::EventLoop;
 fn main() -> Result<(), winit::error::EventLoopError> {
@@ -24,6 +24,7 @@ fn main() -> Result<(), winit::error::EventLoopError> {
         1000.0,
         width as f32 / height as f32,
         90.0,
+        CameraStyle::FPSLike,
     );
     let mut scene = Scene::with_camera(camera);
 

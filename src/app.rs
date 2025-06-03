@@ -10,7 +10,7 @@ use crate::{
     inputs,
     scene::{self, Scene},
 };
-use glam::{bool, DVec2};
+use glam::DVec2;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, ElementState};
 use winit::event_loop::ControlFlow;
@@ -133,17 +133,8 @@ impl App {
                 Action::RotateCamera { pitch, yaw, roll } => {
                     if self.mouse_captured {
                         let camera = self.scene.camera_mut();
-                        camera.yaw(*yaw);
-                        camera.pitch(*pitch);
-                        camera.roll(*roll);
+                        camera.yaw_pitch_roll(*yaw, *pitch, *roll);
                     }
-                    // // Rotate around world's y axis. Simulates FPS camera.
-                    // let fixed_yaw_qat = DQuat::from_axis_angle(DVec3::Y, *yaw);
-                    // camera.rotate(&fixed_yaw_qat);
-                    //
-                    // // Rotate around world's x axis. Simulates FPS camera.
-                    // let fixed_pitch_qat = DQuat::from_axis_angle(DVec3::X, *pitch);
-                    // camera.rotate(&fixed_pitch_qat);
                 }
                 Action::ToggleMouseCapture => {
                     self.capture_mouse(!self.mouse_captured);

@@ -1,5 +1,7 @@
 //! Contains everything realted to the [`Camera`].
 
+use std::f64;
+
 use glam::{DMat4, DQuat, DVec3, DVec4};
 
 /// Contains the necessary information to define a [`Camera`].
@@ -20,6 +22,8 @@ pub struct Camera {
     projection: Projection,
     /// Velocity of the camera (in meters/sec).
     velocity: f64,
+    /// Dictates how the camera will behave when moved with the mouse.
+    camera_style: CameraStyle,
 }
 impl Default for Camera {
     /// Creates a default [`Camera`].
@@ -41,6 +45,7 @@ impl Default for Camera {
             1000.0,
             16.0 / 9.0,
             90.0,
+            CameraStyle::FPSLike,
         )
     }
 }
@@ -80,6 +85,17 @@ pub enum Direction {
     /// Down direction.
     Down,
 }
+/// Dictates how the camera's yaw/pitch/roll will be controlled.
+pub enum CameraStyle {
+    /// Yaw - rotates around the world's Y axis.
+    /// Pitch - rotates aroudn the local X axis.
+    /// Roll - no roll.
+    FPSLike,
+    /// Yaw - rotates around the local Y axis.
+    /// Pitch - rotates aroudn the local X axis.
+    /// Roll - rotates around the local Z axis.
+    Free,
+}
 impl Camera {
     /// Creates a new [`Camera`] from its fields.
     pub fn new_perspective(
@@ -89,6 +105,7 @@ impl Camera {
         far_clip: f32,
         aspect_ratio: f32,
         hfov: f32,
+        camera_style: CameraStyle,
     ) -> Self {
         let perspective = Projection::Perspective {
             near_clip,
@@ -102,6 +119,7 @@ impl Camera {
             transform: DMat4::IDENTITY,
             projection: perspective,
             velocity: 500.0,
+            camera_style,
         };
         c.update_transform();
         c
@@ -141,13 +159,13 @@ impl Camera {
     /// # Arguments
     ///
     /// * `rot` - The rotation to add to our current rotation.
-    pub fn rotate(&mut self, rot: &DQuat) {
+    pub fn quat_rotation(&mut self, rot: &DQuat) {
         //q_total = q_second * q_first
         self.quat = rot.mul_quat(self.quat).normalize();
         // Ensure the transformation matrix stays up to date.
         self.update_transform();
     }
-    /// Pitch the `camera` up or down.
+    /// Pitch the `camera` up or down (rotate around local X axis).
     ///
     /// # Arguments
     ///
@@ -156,9 +174,9 @@ impl Camera {
     pub fn pitch(&mut self, angle: f64) {
         let axis = self.quat.mul_vec3(DVec3::X);
         let quat = DQuat::from_axis_angle(axis, angle);
-        self.rotate(&quat);
+        self.quat_rotation(&quat);
     }
-    /// Yaw the `camera` right or left.
+    /// Yaw the `camera` right or left (rotate around local Y axis).
     ///
     /// # Arguments
     ///
@@ -167,9 +185,9 @@ impl Camera {
     pub fn yaw(&mut self, angle: f64) {
         let axis = self.quat.mul_vec3(DVec3::Y);
         let quat = DQuat::from_axis_angle(axis, angle);
-        self.rotate(&quat);
+        self.quat_rotation(&quat);
     }
-    /// Roll the `camera` CW or CCW (as seen when looking forwards).
+    /// Roll the `camera` CW or CCW (rotate around local Z axis).
     ///
     /// # Arguments
     ///
@@ -178,7 +196,7 @@ impl Camera {
     pub fn roll(&mut self, angle: f64) {
         let axis = self.quat.mul_vec3(DVec3::NEG_Z);
         let quat = DQuat::from_axis_angle(axis, angle);
-        self.rotate(&quat);
+        self.quat_rotation(&quat);
     }
     /// Sets the camera rotation with a quaternion.
     ///
@@ -220,6 +238,38 @@ impl Camera {
     pub fn add_velocity(&mut self, velocity: f64) {
         self.velocity = f64::max(0.0, self.velocity + velocity);
     }
+    /// Yaw pitch and roll the camera according the the `camera_style` chosen.
+    ///
+    /// # Arguments
+    ///
+    /// * `yaw` - Pan the camera left/right (in radians).
+    /// * `pitch` - Pitch the camera up/down (in radians).
+    /// * `roll` - Roll the camera CW/CCW (in radians).
+    pub fn yaw_pitch_roll(&mut self, yaw: f64, pitch: f64, roll: f64) {
+        match self.camera_style {
+            CameraStyle::FPSLike => {
+                self.quat_rotation(&DQuat::from_axis_angle(DVec3::Y, yaw));
+                self.pitch(pitch);
+                // No roll in fps.
+
+                // Correct pitch to ensure -90 <= pitch <= 90.
+                let dot = f64::clamp(DVec3::Y.dot(self.quat.mul_vec3(DVec3::Y)), -1.0, 1.0);
+                // Check if pitch is greater than 90 degrees.
+                if dot < 0.0 {
+                    let correction = dot.acos() - f64::consts::FRAC_PI_2;
+                    // Ensure correction is in the right direction.
+                    let sign = -DVec3::Y.dot(self.quat.mul_vec3(DVec3::NEG_Z)).signum();
+                    // Now pitch correct.
+                    self.pitch(correction * sign);
+                }
+            }
+            CameraStyle::Free => {
+                self.yaw(yaw);
+                self.pitch(pitch);
+                self.roll(roll);
+            }
+        }
+    }
 }
 // Getters and setters.
 impl Camera {
@@ -253,5 +303,13 @@ impl Camera {
     /// Sets the velocity of the camera.
     pub fn set_velocity(&mut self, velocity: f64) {
         self.velocity = velocity;
+    }
+    /// Reference to the quaternion defining the camera's rotation.
+    pub fn quat(&self) -> &DQuat {
+        &self.quat
+    }
+    /// Sets the camera movement style.
+    pub fn set_camera_style(&mut self, camera_style: CameraStyle) {
+        self.camera_style = camera_style;
     }
 }
