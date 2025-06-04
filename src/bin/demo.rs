@@ -1,4 +1,5 @@
 use glam::{DQuat, DVec3};
+use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
 // use glam::vec2;
 // use ndarray;
 // let a: ndarray::Array2<i32> = ndarray::Array2::from_shape_vec((2, 3), b).unwrap();
@@ -63,5 +64,12 @@ fn main() -> Result<(), winit::error::EventLoopError> {
     let mut app = App::new(width, height, scene);
     // app.set_max_it(30);
     event_loop.run_app(&mut app)?;
+    // let mut test: Vec<u8> = vec![1,2,3,4,5,6,7,8];
+    // let mut color_chunks: Vec<&mut [u8]> = test.chunks_mut(2).collect();
+    // color_chunks.par_iter_mut().for_each(|v| {
+    //     v[0]=1;
+    // });
     Ok(())
+
+
 }

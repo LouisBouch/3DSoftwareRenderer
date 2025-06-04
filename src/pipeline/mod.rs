@@ -2,6 +2,10 @@
 
 use geometry::Geometry;
 use glam::{DVec2, Vec3Swizzles, Vec4Swizzles};
+use rayon::{
+    iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator},
+    slice::ParallelSlice,
+};
 
 use crate::{algorithm, graphics::screen::Screen, resources::texture::Texture, scene::Scene};
 
@@ -116,29 +120,30 @@ impl Pipeline {
                 + gamma_grad.x * uv_c * w_inv_c;
 
             // Get bounding box of triangle.
-            // max values are excluded, while min values are included.
-            let (mut min_x, mut max_x, mut min_y, mut max_y) =
-                Pipeline::triangle_aabs(a.xy(), b.xy(), c.xy());
-            // Ensure they don't cross the screen's border.
-            min_x = min_x.clamp(0, width);
-            min_y = min_y.clamp(0, height);
-            max_x = max_x.clamp(0, width);
-            max_y = max_y.clamp(0, height);
+            // Both max and min values are included
+            let (min_xf64, max_xf64, min_yf64, max_yf64) =
+                algorithm::triangle_aabs(a.xy(), b.xy(), c.xy());
+            // Ensure they don't cross the screen's border, and convert them to
+            // integer screen coordinates.
+            let min_x = min_xf64.max(0.0) as usize;
+            let min_y = min_yf64.max(0.0) as usize;
+            let max_x = (max_xf64 as usize).min(width - 1);
+            let max_y = (max_yf64 as usize).min(height - 1);
 
             // Add 0.5 to both x and y in order to sample the pixel at its center.
-            let min_pos = DVec2::new(min_x as f64 + 0.5, min_y as f64 + 0.5);
+            let min_posf64 = DVec2::new(min_x as f64 + 0.5, min_y as f64 + 0.5);
 
             // Get barycentric coordinates at min_pos.
             let (alpha_00, beta_00, gamma_00) = (
-                alpha_grad.dot(min_pos - c.xy()),
-                beta_grad.dot(min_pos - a.xy()),
-                gamma_grad.dot(min_pos - b.xy()),
+                alpha_grad.dot(min_posf64 - c.xy()),
+                beta_grad.dot(min_posf64 - a.xy()),
+                gamma_grad.dot(min_posf64 - b.xy()),
             );
             // Initialize coordinates for first row (redundant, but clearer)
             let (mut alpha_0y, mut beta_0y, mut gamma_0y) = (alpha_00, beta_00, gamma_00);
 
             // Rasterize over the bounding box.
-            for y in min_y..max_y {
+            for y in min_y..=max_y {
                 let mut pixel_index = (min_x + y * width) as usize;
                 // Initialize bayrcentric coordinates and other important values for the first x
                 // value of the bounding square.
@@ -149,7 +154,7 @@ impl Pipeline {
                     + beta_xy * uv_b * w_inv_b
                     + gamma_xy * uv_c * w_inv_c; // Weird value, but useful given its linear
                                                  // properties in screen space.
-                for _ in min_x..max_x {
+                for _ in min_x..=max_x {
                     // Check if pixel is inside the triangle.
                     if (alpha_xy >= 0.0) & (beta_xy >= 0.0) & (gamma_xy >= 0.0) {
                         // Make sure pixels closer to the screen have not been been drawn.
@@ -207,27 +212,121 @@ impl Pipeline {
             }
         }
     }
-    /// Given the vertices of a triangle, obtain its axis aligned bounding square.
+    /// Raterizes the geometry on the screen buffer while making use of multithreading.
     ///
-    /// # Return
-    ///
-    /// The maximum and minimum values of x and y of the bounding square
-    /// in the following format:
-    /// (min_x, max_x, min_y, max_y)
-    fn triangle_aabs(a: DVec2, b: DVec2, c: DVec2) -> (usize, usize, usize, usize) {
-        let mut min_x = a.x.min(b.x).min(c.x).floor();
-        let mut max_x = a.x.max(b.x).max(c.x).ceil();
-        let mut min_y = a.y.min(b.y).min(c.y).floor();
-        let mut max_y = a.y.max(b.y).max(c.y).ceil();
-        min_x = if min_x < 0.0 { 0.0 } else { min_x };
-        max_x = if max_x < 0.0 { 0.0 } else { max_x };
-        min_y = if min_y < 0.0 { 0.0 } else { min_y };
-        max_y = if max_y < 0.0 { 0.0 } else { max_y };
-        (
-            min_x as usize,
-            max_x as usize,
-            min_y as usize,
-            max_y as usize,
-        )
+    /// Uses a tilling approach, where the screen is divided into different
+    /// tiles of size `tile_size`² and each one is rasterized by a different using rayon.
+    pub fn rasterize_threaded(
+        &self,
+        geometry: &Geometry,
+        screen: &mut Screen,
+        texture: Option<&Texture>,
+        tile_size: usize,
+    ) {
+        // Get useful values for rasterizing.
+        let vertices = geometry.vertices();
+        let uvs = geometry.uvs();
+        let w_invs = geometry.clip_w_inv();
+        let triangles = geometry.triangles();
+        let (width, height) = (screen.width(), screen.height());
+        let (frame, depth_buffer) = screen.buffers_mut();
+        // Get number of channels the texture format requries (0 if no texture).
+        let nb_channels = if let Some(t) = texture {
+            t.nb_chanels() as usize
+        } else {
+            0
+        };
+
+        // Figure out how many tiles are required given its size.
+        let (tiles_x, tiles_y) = (
+            (width + tile_size - 1) / tile_size,
+            (height + tile_size - 1) / tile_size,
+        );
+
+        // Create tile buffers for the frame and depth.
+        let mut depth_buffers: Vec<Vec<f64>> =
+            vec![Vec::with_capacity(tile_size * tile_size); tiles_x * tiles_y];
+        let mut frame_buffers: Vec<Vec<u8>> =
+            vec![Vec::with_capacity(tile_size * tile_size * 4); tiles_x * tiles_y];
+
+        // Bin the triangles into the different tiles.
+        let mut binned_triangles: Vec<Vec<BinnedTriangle>> = vec![Vec::new(); tiles_x * tiles_y];
+
+        // Start binning the triangles.
+        for triangle_index_start in (0..triangles.len()).step_by(3) {
+            // Triangle vertex indices.
+            let (ai, bi, ci) = (
+                triangles[triangle_index_start],
+                triangles[triangle_index_start + 1],
+                triangles[triangle_index_start + 2],
+            );
+            // Triangle vertex position in space.
+            let (a, b, c) = (vertices[ai].xyz(), vertices[bi].xyz(), vertices[ci].xyz());
+
+            // Get bounding box of triangle.
+            // Both max and min values are included
+            let (min_xf64, max_xf64, min_yf64, max_yf64) =
+                algorithm::triangle_aabs(a.xy(), b.xy(), c.xy());
+            // Ensure they don't cross the screen's border, and convert them to
+            // integer screen coordinates.
+            let min_x = min_xf64.max(0.0) as usize;
+            let min_y = min_yf64.max(0.0) as usize;
+            let max_x = (max_xf64 as usize).min(width - 1);
+            let max_y = (max_yf64 as usize).min(height - 1);
+
+            // Given the triangle's corner positions, find which tiles it intersects.
+            let (first_tile_x, last_tile_x, first_tile_y, last_tile_y) = (
+                min_x / tile_size,
+                max_x / tile_size,
+                min_y / tile_size,
+                max_y / tile_size,
+            );
+            // Add the triangle to the bin of each tile.
+            for tile_x in first_tile_x..=last_tile_x {
+                for tile_y in first_tile_y..=last_tile_y {
+                    let mut binned_triangle = BinnedTriangle::new();
+                    // Get the relative position of the aabs within the tile.
+                    binned_triangle.min_x = min_x - (tile_x * tile_size).max(min_x);
+                    binned_triangle.min_y = min_y - (tile_y * tile_size).max(min_y);
+                    binned_triangle.max_x = (max_x - tile_x * tile_size).min(tile_size);
+                    binned_triangle.max_y = (max_y - tile_y * tile_size).min(tile_size);
+                    // Push it in the corresponding bin.
+                    binned_triangles[tiles_x * tiles_y].push(binned_triangle);
+                }
+            }
+            // Rasterize in parallel on each tile.
+            frame_buffers
+                .par_iter_mut()
+                .zip(depth_buffers.par_iter_mut())
+                .for_each(|(frame_buf, depth_buf)| {});
+            // Write back to the main frame/depth buffers. 
+            // Use concurrency?
+        }
+    }
+}
+/// Containts the necessary data to handle a triangle from geometry binned in a tile.
+#[derive(Clone, Copy)]
+struct BinnedTriangle {
+    /// Start index of the triangle within the geometry.
+    pub triangle_start: usize,
+    /// Minimum x value of the triangle's aabs relative to the tile.
+    pub min_x: usize,
+    /// Minimum y value of the triangle's aabs relative to the tile.
+    pub min_y: usize,
+    /// Maximum x value of the triangle's aabs relative to the tile.
+    pub max_x: usize,
+    /// Maximum y value of the triangle's aabs relative to the tile.
+    pub max_y: usize,
+}
+impl BinnedTriangle {
+    /// Create default BinnedTriangle with 0 for every value.
+    pub fn new() -> Self {
+        BinnedTriangle {
+            triangle_start: 0,
+            min_x: 0,
+            min_y: 0,
+            max_x: 0,
+            max_y: 0,
+        }
     }
 }

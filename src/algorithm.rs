@@ -69,7 +69,6 @@ pub fn barycentric_gradients2(a: DVec2, b: DVec2, c: DVec2) -> (DVec2, DVec2, DV
 
     (u_alpha, u_beta, u_gamma)
 }
-#[inline(always)]
 /// Converts four 8bit numbers into a single u32. (Use u32::from_be_bytes instead)
 ///
 /// # Arguments
@@ -82,6 +81,31 @@ pub fn barycentric_gradients2(a: DVec2, b: DVec2, c: DVec2) -> (DVec2, DVec2, DV
 /// # Return
 ///
 /// The u32 made from the four 8bit numbers (b1b2b3b4).
+#[inline(always)]
 pub fn u8s_to_u32(b1: u8, b2: u8, b3: u8, b4: u8) -> u32 {
     (b1 as u32) << 24 | (b2 as u32) << 16 | (b3 as u32) << 8 | (b4 as u32)
+}
+/// Given the vertices of a triangle, obtain its axis aligned bounding square.
+///
+/// # Return
+///
+/// The maximum and minimum values of x and y of the bounding square
+/// in the following format:
+/// (min_x, max_x, min_y, max_y)
+#[inline(always)]
+pub fn triangle_aabs(a: DVec2, b: DVec2, c: DVec2) -> (f64, f64, f64, f64) {
+    let mut min_x = a.x.min(b.x).min(c.x).floor();
+    let mut max_x = a.x.max(b.x).max(c.x).ceil();
+    let mut min_y = a.y.min(b.y).min(c.y).floor();
+    let mut max_y = a.y.max(b.y).max(c.y).ceil();
+    min_x = if min_x < 0.0 { 0.0 } else { min_x };
+    max_x = if max_x < 0.0 { 0.0 } else { max_x };
+    min_y = if min_y < 0.0 { 0.0 } else { min_y };
+    max_y = if max_y < 0.0 { 0.0 } else { max_y };
+    (
+        min_x,
+        max_x,
+        min_y,
+        max_y,
+    )
 }
