@@ -9,7 +9,10 @@ use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelI
 use soft_rend::{
     app::App,
     resources::loaders::{DefaultMesh, DefaultTexture, MeshLoader, TextureLoader},
-    scene::{camera::{Camera, CameraStyle}, Scene},
+    scene::{
+        camera::{Camera, CameraStyle},
+        Scene,
+    },
 };
 use winit::event_loop::EventLoop;
 fn main() -> Result<(), winit::error::EventLoopError> {
@@ -70,6 +73,4 @@ fn main() -> Result<(), winit::error::EventLoopError> {
     //     v[0]=1;
     // });
     Ok(())
-
-
 }

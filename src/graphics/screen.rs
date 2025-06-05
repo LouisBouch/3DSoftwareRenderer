@@ -72,8 +72,6 @@ impl Screen {
     }
     /// Draws a texture on the screen. Where 0,0 on the screen is 0,0 uv, and width, height, is 1,1
     /// uv.
-    /// TODO: Either remove this function, or update it to match how the rasterizer draws to
-    /// screen.
     pub fn draw_texture(&mut self, texture: &Texture) {
         let width = self.width;
         let height = self.height;
