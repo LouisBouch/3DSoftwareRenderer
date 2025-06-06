@@ -14,6 +14,8 @@ pub struct Window {
     height: usize,
     /// Shared instance of the winit window.
     winit_window: Option<Arc<window::Window>>,
+    /// The name of the window.
+    window_name: String,
 }
 
 impl Window {
@@ -34,6 +36,7 @@ impl Window {
             width: width,
             height: height,
             winit_window: None,
+            window_name: String::from("Software Renderer"),
         }
     }
     /// Initializes the winit window.
@@ -53,23 +56,33 @@ impl Window {
     ) -> Result<(), OsError> {
         let size = dpi::LogicalSize::new(self.width as f64, self.height as f64);
         let attributes = window::Window::default_attributes()
-            .with_title("Sofware renderer")
+            .with_title(&self.window_name)
             .with_inner_size(size)
             .with_min_inner_size(size);
         let winit_window = event_loop.create_window(attributes)?;
         self.winit_window = Some(Arc::new(winit_window));
         Ok(())
     }
-    /// Getter for the width.
+    /// Reference for the width.
     pub fn width(&self) -> usize{
         self.width
     }
-    /// getter for the height.
+    /// Reference for the height.
     pub fn height(&self) -> usize{
         self.height
     }
     /// Mutable getter for the winit window.
     pub fn winit_window_mut(&self) -> Option<&Arc<window::Window>> {
         self.winit_window.as_ref()
+    }
+    /// Reference to the name of the window.
+    pub fn window_name(&self) -> &str {
+        &self.window_name
+    }
+    /// Add a suffix to the window name.
+    pub fn add_window_name_suffix(&mut self, suffix: &str) {
+        if let Some(winit_w) = self.winit_window.as_mut() {
+            winit_w.set_title(&(self.window_name.clone() + suffix));
+        }
     }
 }

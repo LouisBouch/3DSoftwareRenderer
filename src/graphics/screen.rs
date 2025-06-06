@@ -16,6 +16,8 @@ pub struct Screen {
     pixels: Option<pixels::Pixels<'static>>,
     /// Buffer containing pixel depths.
     depth_buffer: Vec<f64>,
+    /// Background color.
+    bg_color: [u8; 4],
 }
 
 impl Screen {
@@ -37,6 +39,7 @@ impl Screen {
             height,
             pixels: None,
             depth_buffer: vec![f64::MAX; (width * height) as usize],
+            bg_color: [42, 0, 23, 255],
         }
     }
     /// Initializes the pixels instance.
@@ -64,10 +67,23 @@ impl Screen {
     }
     /// Clears the screen to black, and resets depth buffer.
     pub fn screen_clear(&mut self) {
-        // Reset screen.
-        for pixel in self.pixels_mut().unwrap().frame_mut().chunks_exact_mut(4) {
-            pixel.copy_from_slice(&[42, 0, 23, 255]);
-        }
+        // Reset screen (Not needed when multithreading, as the threads create their own buffer
+        // with the default color).
+        // let color = self.bg_color;
+        // Safe pixel reset.
+        // for pixel in self.pixels_mut().unwrap().frame_mut().chunks_exact_mut(4) {
+        //     pixel.copy_from_slice(&color);
+        // }
+        // Unsafe option. Doesn't seem faster than the safe one for some reason.
+        // let coloru32 = u32::from_ne_bytes(color);
+        // let frame = self.pixels.as_mut().unwrap().frame_mut();
+        // let nb_pixels = frame.len() / 4;
+        // unsafe {
+        //     let frame_ptr = frame.as_mut_ptr() as *mut u32;
+        //     for i in 0..nb_pixels {
+        //         std::ptr::write_unaligned(frame_ptr.add(i), coloru32);
+        //     }
+        // }
         self.depth_buffer = vec![f64::MAX; (self.width * self.height) as usize];
     }
     /// Draws a texture on the screen. Where 0,0 on the screen is 0,0 uv, and width, height, is 1,1
@@ -109,7 +125,10 @@ impl Screen {
     ///
     /// (frame_buffer, depth_buffer)
     pub fn buffers_mut(&mut self) -> (&mut [u8], &mut [f64]) {
-        (self.pixels.as_mut().unwrap().frame_mut(), &mut self.depth_buffer)
+        (
+            self.pixels.as_mut().unwrap().frame_mut(),
+            &mut self.depth_buffer,
+        )
     }
     /// Getter for screen width.
     pub fn width(&self) -> usize {
@@ -118,5 +137,9 @@ impl Screen {
     /// Getter for screen height.
     pub fn height(&self) -> usize {
         self.height
+    }
+    /// Reference to the background color.
+    pub fn bg_color(&self) -> &[u8] {
+        &self.bg_color
     }
 }

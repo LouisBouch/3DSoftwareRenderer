@@ -175,11 +175,11 @@ impl App {
         // Check fps count (at most once every second).
         let now = Instant::now();
         if self.last_fps_count_time + Duration::from_secs(1) <= now {
-            // Print fps count.
-            println!(
-                "fps: {}",
+            // Print fps count to window title.
+            self.window.add_window_name_suffix(&format!(
+                " (FPS: {:.2})",
                 self.frame_count as f64 / (now - self.last_fps_count_time).as_secs_f64()
-            );
+            ));
             self.last_fps_count_time = now;
             self.frame_count = 0;
         }

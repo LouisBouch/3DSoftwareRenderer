@@ -67,7 +67,8 @@ impl Pipeline {
                     } else {
                         None
                     };
-                    self.rasterize(&geometry, screen, texture);
+                    // self.rasterize(&geometry, screen, texture);
+                    self.rasterize_threaded(&geometry, screen, texture, 64);
                 }
             }
             crate::scene::camera::Projection::Orthographic { .. } => {
@@ -174,7 +175,7 @@ impl Pipeline {
                                         std::ptr::copy_nonoverlapping(
                                             color.as_ptr(),
                                             frame.as_mut_ptr().add(pixel_channel_index),
-                                            3,
+                                            nb_channels,
                                         );
                                     }
                                     // If texture didn't have an alpha channel, use max alpha.
@@ -213,6 +214,7 @@ impl Pipeline {
     ///
     /// Uses a tilling approach, where the screen is divided into different
     /// tiles of size `tile_size`² and each one is rasterized by a different using rayon.
+    /// TILES GO LEFT TO RIGHT, TOP TO BOTTOM.
     pub fn rasterize_threaded(
         &self,
         geometry: &Geometry,
@@ -226,7 +228,6 @@ impl Pipeline {
         let w_invs = geometry.clip_w_inv();
         let triangles = geometry.triangles();
         let (width, height) = (screen.width(), screen.height());
-        let (frame, depth_buffer) = screen.buffers_mut();
         // Get number of channels the texture format requries (0 if no texture).
         let nb_channels = if let Some(t) = texture {
             t.nb_chanels() as usize
@@ -235,20 +236,28 @@ impl Pipeline {
         };
 
         // Figure out how many tiles are required given its size.
-        let (nb_tile_x, nb_tile_y) = (
+        let (nb_tiles_x, nb_tiles_y) = (
             (width + tile_size - 1) / tile_size,
             (height + tile_size - 1) / tile_size,
         );
 
         // Create tile buffers for the frame and depth.
         let mut depth_buffers: Vec<Vec<f64>> =
-            vec![Vec::with_capacity(tile_size * tile_size); nb_tile_x * nb_tile_y];
-        let mut frame_buffers: Vec<Vec<u8>> =
-            vec![Vec::with_capacity(tile_size * tile_size * 4); nb_tile_x * nb_tile_y];
+            vec![vec![f64::MAX; tile_size * tile_size]; nb_tiles_x * nb_tiles_y];
+        let mut frame_buffers: Vec<Vec<u8>> = vec![
+            screen
+                .bg_color()
+                .to_vec()
+                .into_iter()
+                .cycle()
+                .take(tile_size * tile_size * 4)
+                .collect();
+            nb_tiles_x * nb_tiles_y
+        ];
 
         // Bin the triangles into the different tiles.
         let mut binned_triangles: Vec<Vec<BinnedTriangle>> =
-            vec![Vec::new(); nb_tile_x * nb_tile_y];
+            vec![Vec::new(); nb_tiles_x * nb_tiles_y];
 
         // Start binning the triangles.
         for triangle_index_start in (0..triangles.len()).step_by(3) {
@@ -273,6 +282,7 @@ impl Pipeline {
             let max_y = (max_yf64 as usize).min(height - 1);
 
             // Given the triangle's corner positions, find which tiles it intersects.
+            // Both first and last tiles are inclusive.
             let (first_tile_x, last_tile_x, first_tile_y, last_tile_y) = (
                 min_x / tile_size,
                 max_x / tile_size,
@@ -280,17 +290,17 @@ impl Pipeline {
                 max_y / tile_size,
             );
             // Add the triangle to the bin of each tile.
-            for tile_x in first_tile_x..=last_tile_x {
-                for tile_y in first_tile_y..=last_tile_y {
+            for tile_y in first_tile_y..=last_tile_y {
+                for tile_x in first_tile_x..=last_tile_x {
                     let mut binned_triangle = BinnedTriangle::new();
                     // Get the relative position of the aabs within the tile.
-                    binned_triangle.min_x = min_x - (tile_x * tile_size).max(min_x);
-                    binned_triangle.min_y = min_y - (tile_y * tile_size).max(min_y);
-                    binned_triangle.max_x = (max_x - tile_x * tile_size).min(tile_size);
-                    binned_triangle.max_y = (max_y - tile_y * tile_size).min(tile_size);
+                    binned_triangle.min_x = min_x - (tile_x * tile_size).min(min_x);
+                    binned_triangle.min_y = min_y - (tile_y * tile_size).min(min_y);
+                    binned_triangle.max_x = (max_x - tile_x * tile_size).min(tile_size - 1);
+                    binned_triangle.max_y = (max_y - tile_y * tile_size).min(tile_size - 1);
                     binned_triangle.triangle_start = triangle_index_start;
                     // Push it in the corresponding bin.
-                    binned_triangles[tile_x + tile_y * nb_tile_y].push(binned_triangle);
+                    binned_triangles[tile_x + tile_y * nb_tiles_x].push(binned_triangle);
                 }
             }
         }
@@ -300,6 +310,10 @@ impl Pipeline {
             .zip(depth_buffers.par_iter_mut())
             .enumerate()
             .for_each(|(tile_nb, (tile_frame_buffer, tile_depth_buf))| {
+                // Obtain the tile's coordinate from the tile number.
+                let x_offset = (tile_nb % nb_tiles_x) * tile_size;
+                let y_offset = (tile_nb / nb_tiles_x) * tile_size;
+
                 // Rasterize each triangle inside the tile.
                 let binned_triangles_tile: &[BinnedTriangle] = &binned_triangles[tile_nb];
                 for binned_triangle in binned_triangles_tile.iter() {
@@ -336,23 +350,27 @@ impl Pipeline {
                     let max_x = binned_triangle.max_x;
                     let max_y = binned_triangle.max_y;
 
+                    // Screen coordinates at the top left of the aabs.
                     // Add 0.5 to both x and y in order to sample the pixel at its center.
-                    let min_posf64 = DVec2::new(min_x as f64 + 0.5, min_y as f64 + 0.5);
+                    let min_posf64_screen = DVec2::new(
+                        (x_offset + min_x) as f64 + 0.5,
+                        (y_offset + min_y) as f64 + 0.5,
+                    );
 
                     // Get barycentric coordinates at min_pos.
                     let (alpha_00, beta_00, gamma_00) = (
-                        alpha_grad.dot(min_posf64 - c.xy()),
-                        beta_grad.dot(min_posf64 - a.xy()),
-                        gamma_grad.dot(min_posf64 - b.xy()),
+                        alpha_grad.dot(min_posf64_screen - c.xy()),
+                        beta_grad.dot(min_posf64_screen - a.xy()),
+                        gamma_grad.dot(min_posf64_screen - b.xy()),
                     );
                     // Initialize coordinates for first row (redundant, but clearer)
                     let (mut alpha_0y, mut beta_0y, mut gamma_0y) = (alpha_00, beta_00, gamma_00);
 
-                    // Rasterize over the bounding box.
+                    // Rasterize over the bounding box (with respect to the tile).
                     for y in min_y..=max_y {
-                        let mut pixel_index = min_x + y * tile_size;
-                        // Initialize bayrcentric coordinates and other important values for the first x
-                        // value of the bounding square.
+                        let mut pixel_index = min_x + y * tile_size; // With respect to the tile.
+                                                                     // Initialize bayrcentric coordinates and other important values for the first x
+                                                                     // value of the bounding square.
                         let (mut alpha_xy, mut beta_xy, mut gamma_xy) =
                             (alpha_0y, beta_0y, gamma_0y);
                         let mut depth = alpha_xy * a.z + beta_xy * b.z + gamma_xy * c.z;
@@ -363,45 +381,46 @@ impl Pipeline {
                                                          // properties in screen space.
                         for _ in min_x..=max_x {
                             // Check if pixel is inside the triangle.
-                            if (alpha_xy >= 0.0) & (beta_xy >= 0.0) & (gamma_xy >= 0.0) {
-                                // Make sure pixels closer to the screen have not been been drawn.
-                                // Smaller depth means closer to screen.
-                                if depth < tile_depth_buf[pixel_index] {
-                                    tile_depth_buf[pixel_index] = depth;
+                            // &&
+                            // Make sure pixels closer to the screen have not been been drawn.
+                            // Smaller depth means closer to screen.
+                            if ((alpha_xy >= 0.0) & (beta_xy >= 0.0) & (gamma_xy >= 0.0))
+                                && depth < tile_depth_buf[pixel_index]
+                            {
+                                tile_depth_buf[pixel_index] = depth;
 
-                                    // Get the UV coordinates of the pixel.
-                                    let uv = uv_over_w / w_inv;
+                                // Get the UV coordinates of the pixel.
+                                let uv = uv_over_w / w_inv;
 
-                                    // Given the UV coordinates, get the texture color and draw it.
-                                    let pixel_channel_index = 4 * pixel_index;
-                                    match texture {
-                                        Some(texture) => {
-                                            let color = texture.from_uv(uv[0], uv[1]);
-                                            // SAFETY: frame is guaranteed to have at least 4 valid indices
-                                            // after pixel_channel_index, and color has at most 4. Thus,
-                                            // when copying, nothing will go out of bounds.
-                                            unsafe {
-                                                std::ptr::copy_nonoverlapping(
-                                                    color.as_ptr(),
-                                                    tile_frame_buffer
-                                                        .as_mut_ptr()
-                                                        .add(pixel_channel_index),
-                                                    3,
-                                                );
-                                            }
-                                            // If texture didn't have an alpha channel, use max alpha.
-                                            if nb_channels != 4 {
-                                                tile_frame_buffer[pixel_channel_index + 3] = 255;
-                                            }
+                                // Given the UV coordinates, get the texture color and draw it.
+                                let pixel_channel_index = 4 * pixel_index;
+                                match texture {
+                                    Some(texture) => {
+                                        let color = texture.from_uv(uv[0], uv[1]);
+                                        // SAFETY: frame is guaranteed to have at least 4 valid indices
+                                        // after pixel_channel_index, and color has at most 4. Thus,
+                                        // when copying, nothing will go out of bounds.
+                                        unsafe {
+                                            std::ptr::copy_nonoverlapping(
+                                                color.as_ptr(),
+                                                tile_frame_buffer
+                                                    .as_mut_ptr()
+                                                    .add(pixel_channel_index),
+                                                nb_channels,
+                                            );
                                         }
-                                        // Black if no texture.
-                                        None => {
-                                            tile_frame_buffer
-                                                [pixel_channel_index..pixel_channel_index + 4]
-                                                .copy_from_slice(&[0, 0, 0, 255]);
+                                        // If texture didn't have an alpha channel, use max alpha.
+                                        if nb_channels != 4 {
+                                            tile_frame_buffer[pixel_channel_index + 3] = 255;
                                         }
-                                    };
-                                }
+                                    }
+                                    // Black if no texture.
+                                    None => {
+                                        tile_frame_buffer
+                                            [pixel_channel_index..pixel_channel_index + 4]
+                                            .copy_from_slice(&[0, 0, 0, 255]);
+                                    }
+                                };
                             }
                             // Update barycentric coordinates for next horizontal pixel.
                             alpha_xy += alpha_grad.x;
@@ -423,10 +442,10 @@ impl Pipeline {
                 }
             });
         // Write back to the main frame/depth buffers.
-        // Use concurrency?
-        for tile_y in 0..nb_tile_y {
-            let mut tile_nb = tile_y * nb_tile_x;
-            for tile_x in 0..nb_tile_x {
+        let (frame, depth_buffer) = screen.buffers_mut();
+        for tile_y in 0..nb_tiles_y {
+            let mut tile_nb = tile_y * nb_tiles_x;
+            for tile_x in 0..nb_tiles_x {
                 // Get references to the buffers.
                 let tile_frame_buffer: &[u8] = &frame_buffers[tile_nb];
                 let tile_depth_buffer: &[f64] = &depth_buffers[tile_nb];
@@ -435,26 +454,34 @@ impl Pipeline {
                 let first_pixel_index = tile_x * tile_size + tile_y * tile_size * width;
 
                 // For each row in the tile, copy it over to the main frame buffer.
-                for tile_row in 0..tile_size {
-                    unsafe {
-                        std::ptr::copy_nonoverlapping(
-                            tile_frame_buffer.as_ptr().add(tile_row*tile_size*4),
-                            frame.as_mut_ptr().add(first_pixel_index*4),
-                            tile_size,
-                        );
-                    }
-                }
                 // Same for the depth buffer.
                 for tile_row in 0..tile_size {
+                    // Check if you are going beyond the screen's height.
+                    if tile_row + tile_y * tile_size >= height {
+                        break;
+                    }
+                    // Ensure you don't copy too far on the screen and end up
+                    // wrapping/out of bounds.
+                    let pixels_to_copy = (width - tile_x * tile_size).min(tile_size);
                     unsafe {
                         std::ptr::copy_nonoverlapping(
-                            tile_depth_buffer.as_ptr().add(tile_row*tile_size),
-                            depth_buffer.as_mut_ptr().add(first_pixel_index),
-                            tile_size,
+                            tile_frame_buffer.as_ptr().add(tile_row * tile_size * 4),
+                            frame
+                                .as_mut_ptr()
+                                .add((first_pixel_index + tile_row * width) * 4),
+                            pixels_to_copy * 4,
+                        );
+                    }
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(
+                            tile_depth_buffer.as_ptr().add(tile_row * tile_size),
+                            depth_buffer
+                                .as_mut_ptr()
+                                .add(first_pixel_index + tile_row * width),
+                            pixels_to_copy,
                         );
                     }
                 }
-
                 // Go to next tile.
                 tile_nb += 1;
             }
@@ -464,7 +491,7 @@ impl Pipeline {
 /// Containts the necessary data to handle a triangle from geometry binned in a tile.
 #[derive(Clone, Copy)]
 struct BinnedTriangle {
-    /// Start index of the triangle within the geometry.
+    /// Start index of the triangle within the [`geometry::Geometry`]'s triangles vector.
     pub triangle_start: usize,
     /// Minimum x value of the triangle's aabs relative to the tile.
     pub min_x: usize,
