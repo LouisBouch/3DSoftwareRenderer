@@ -61,8 +61,8 @@ impl App {
         let window = Window::new(width, height);
         let input_state = inputs::InputHandler::new();
         let screen = Screen::new(width, height);
-        let fps = 60;
-        let pipeline = Pipeline::new();
+        let fps = 144;
+        let pipeline = Pipeline::new(64, width, height);
         let last_frame_time = Instant::now();
         let last_fps_count = Instant::now();
 
@@ -245,10 +245,10 @@ impl ApplicationHandler for App {
                 let pixels = self.screen.pixels_mut().unwrap();
 
                 // Render them.
+                // TODO: Verify is render is completed before frame is mutated in the renderer.
+                // If not fully complete, this woudl explain the artifacts present when moving in
+                // the scene. Might just be a V-Sync problem.
                 pixels.render().unwrap();
-
-                // Reset screen.
-                self.screen.screen_clear();
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 let key_state = event.state;
@@ -304,6 +304,9 @@ impl ApplicationHandler for App {
             // This value is set now instead of after next_frame to make sure
             // slow frames don't get slowed down a further 1/fps seconds.
             self.next_frame_time = Instant::now() + Duration::from_secs_f64(1.0 / self.fps as f64);
+
+            // Reset screen.
+            self.pipeline.clear();
 
             // Compute frame.
             self.next_frame();

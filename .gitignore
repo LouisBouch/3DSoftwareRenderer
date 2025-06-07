@@ -3,6 +3,7 @@
 # Files used for profiling.
 perf.data
 perf.data.old
+flamegraph*
 
 
 # Added by cargo

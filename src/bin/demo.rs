@@ -36,7 +36,7 @@ fn main() -> Result<(), winit::error::EventLoopError> {
     let mesh_loader = MeshLoader::new();
 
     // Populate the scene.
-    let mut cube = mesh_loader.load_default_mesh(
+    let mut cube1 = mesh_loader.load_default_mesh(
         DefaultMesh::Cube {
             size: 100.0,
             u_repeat: 5.0,
@@ -44,7 +44,7 @@ fn main() -> Result<(), winit::error::EventLoopError> {
         },
         None,
     );
-    cube.translate(DVec3::new(0.0, 0.0, -70.0));
+    cube1.translate(DVec3::new(0.0, 0.0, -700.0));
     let checkered_id = scene
         .texture_catalog_mut()
         .add_texture(
@@ -59,12 +59,21 @@ fn main() -> Result<(), winit::error::EventLoopError> {
             print!("The texture could not be added to the scene: {}", e);
             0
         });
-    cube.set_texture(Some(checkered_id));
-    scene.add_mesh(cube);
+    cube1.set_texture(Some(checkered_id));
+    // Create a wall of cubes.
+    let side = 7;
+    let moves = 110.0;
+    for y in -side/2..=side/2 {
+        for x in -side/2..=side/2 {
+            let mut c = cube1.clone();
+            c.translate(DVec3::new(moves * x as f64, moves * y as f64, 0.0));
+            scene.add_mesh(c);
+        }
+    }
 
     // Create and start the app.
     let mut app = App::new(width, height, scene);
-    // app.set_max_it(30);
+    app.set_max_it(30);
     event_loop.run_app(&mut app)?;
     Ok(())
 }

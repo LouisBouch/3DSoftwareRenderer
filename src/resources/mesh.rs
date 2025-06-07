@@ -2,6 +2,7 @@
 use glam::{DMat4, DQuat, DVec2, DVec3, DVec4};
 
 /// Contains everything required to render a triangle mesh.
+#[derive(Clone)]
 pub struct Mesh {
     /// The id of the texture which is owned by the [`super::texture::TextureCatalog`].
     texture_id: Option<u32>,
@@ -145,6 +146,7 @@ impl Mesh {
     }
 }
 /// Contains the information required for a vertex of a triangle mesh.
+#[derive(Clone)]
 pub struct Vertex {
     /// Homogeneous position of the vertex.
     position: DVec4,

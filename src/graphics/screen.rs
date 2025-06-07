@@ -14,8 +14,6 @@ pub struct Screen {
     height: usize,
     /// Pixels instance used to draw on screen.
     pixels: Option<pixels::Pixels<'static>>,
-    /// Buffer containing pixel depths.
-    depth_buffer: Vec<f64>,
     /// Background color.
     bg_color: [u8; 4],
 }
@@ -38,7 +36,6 @@ impl Screen {
             width,
             height,
             pixels: None,
-            depth_buffer: vec![f64::MAX; (width * height) as usize],
             bg_color: [42, 0, 23, 255],
         }
     }
@@ -84,7 +81,6 @@ impl Screen {
         //         std::ptr::write_unaligned(frame_ptr.add(i), coloru32);
         //     }
         // }
-        self.depth_buffer = vec![f64::MAX; (self.width * self.height) as usize];
     }
     /// Draws a texture on the screen. Where 0,0 on the screen is 0,0 uv, and width, height, is 1,1
     /// uv.
@@ -114,21 +110,6 @@ impl Screen {
     /// Mutable reference for the pixels instance.
     pub fn pixels_mut(&mut self) -> Option<&mut Pixels<'static>> {
         self.pixels.as_mut()
-    }
-    /// Mutable reference for the depth buffer of pixels.
-    pub fn depth_buffer_mut(&mut self) -> &mut [f64] {
-        &mut self.depth_buffer
-    }
-    /// Mutable reference for pixels' frame as well as the depth buffer.
-    ///
-    /// # Return
-    ///
-    /// (frame_buffer, depth_buffer)
-    pub fn buffers_mut(&mut self) -> (&mut [u8], &mut [f64]) {
-        (
-            self.pixels.as_mut().unwrap().frame_mut(),
-            &mut self.depth_buffer,
-        )
     }
     /// Getter for screen width.
     pub fn width(&self) -> usize {
