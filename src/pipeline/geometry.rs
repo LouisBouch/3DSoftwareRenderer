@@ -7,6 +7,7 @@ use glam::{usize, DMat4, DVec2, DVec3, DVec4, Vec4Swizzles};
 use crate::{algorithm, resources::mesh::Mesh};
 
 /// Contains the necessary information to draw shapes on screen.
+#[derive(Clone)]
 pub struct Geometry {
     /// The id of the texture.
     texture_id: Option<u32>,
@@ -20,6 +21,8 @@ pub struct Geometry {
     /// List of inverted w values from the homogeneous coordinates (in clip space before NDC conversion). Useful for interpolation in
     /// screen coordinates, as 1/w is linear in this space.
     clip_w_inv: Vec<f64>,
+    /// List of normals for each triangle when in world space.
+    triangle_normals: Vec<DVec3>,
 }
 
 impl Geometry {
@@ -42,6 +45,7 @@ impl Geometry {
             uvs: uvs.clone(),
             triangles: triangles.clone(),
             clip_w_inv: vec![1.0; vertices.len()],
+            triangle_normals: Vec::with_capacity(vertices.len() / 3),
         }
     }
     /// Constructs a new geometry from a mesh
@@ -54,12 +58,14 @@ impl Geometry {
             vertices.push(*vec.position());
             uvs.push(*vec.uv());
         }
+        let nb_triangles = vertices.len() / 3;
         Geometry {
             texture_id: mesh.texture_id(),
             clip_w_inv: Vec::new(),
             vertices,
             uvs,
             triangles,
+            triangle_normals: Vec::with_capacity(nb_triangles),
         }
     }
 
@@ -257,6 +263,31 @@ impl Geometry {
             self.clip_w_inv.push(1.0 / vertex[3]);
         }
     }
+    /// Sets the normals for the triangles when in world space.
+    ///
+    /// To do so, call this method when the geoemtry has been clipped, but introduce the matrix
+    /// that allows to go from clip space to world space. That way the normals are computed as if
+    /// they were in world space but with the new clipped triangles.
+    pub fn set_triangle_world_normals(&mut self, clip_to_world: DMat4) {
+        let triangles = &self.triangles;
+        let vertices = &self.vertices;
+        for triangle_index_start in (0..triangles.len()).step_by(3) {
+            // Triangle vertex indices.
+            let (ai, bi, ci) = (
+                triangles[triangle_index_start],
+                triangles[triangle_index_start + 1],
+                triangles[triangle_index_start + 2],
+            );
+            // Triangle's vertex positions in screen and world space.
+            let (a, b, c) = (
+                (clip_to_world * vertices[ai]).xyz(),
+                (clip_to_world * vertices[bi]).xyz(),
+                (clip_to_world * vertices[ci]).xyz(),
+            );
+            let triangle_normal = (b - a).cross(c - a).normalize();
+            self.triangle_normals.push(triangle_normal);
+        }
+    }
 }
 // Getters and setters
 impl Geometry {
@@ -293,11 +324,15 @@ impl Geometry {
     /// Reference to the inverted w of the homogeneous coordinate of the vertices making up the mesh.
     ///
     /// This value is used when linearly interpolating coordinates in screen space.
-    pub fn clip_w_inv(&self) -> &Vec<f64> {
+    pub fn clip_w_inv(&self) -> &[f64] {
         &self.clip_w_inv
     }
     /// Gets the texture id if there is one.
     pub fn texture_id(&self) -> Option<u32> {
         self.texture_id
+    }
+    /// The normals for the triangles if they were in world space.
+    pub fn triangle_normals(&self) -> &[DVec3] {
+        &self.triangle_normals
     }
 }

@@ -2,16 +2,19 @@
 
 use geometry::Geometry;
 use rasterizer::Rasterizer;
+use shader::Shader;
 
 use crate::{graphics::screen::Screen, scene::Scene};
 
 pub mod geometry;
 mod rasterizer;
 mod transforms;
+pub mod shader;
 
 /// Contains values imprtant for rendering.
 pub struct Pipeline {
     rasterizer: rasterizer::Rasterizer,
+    shader: Shader,
 }
 
 impl Pipeline {
@@ -21,15 +24,17 @@ impl Pipeline {
     ///
     /// * `tile_size` - Size of the tiles the rasterizer will split the screen with.
     /// * `width` - Width of the screen the pipeline will draw on.
-    /// * `Height` - Height of the screen the pipeline will draw on.
-    pub fn new(tile_size: usize, width: usize, height: usize) -> Self {
+    /// * `height` - Height of the screen the pipeline will draw on.
+    /// * `shader` - What type of shader to use in the pipeline.
+    pub fn new(tile_size: usize, width: usize, height: usize, shader: Shader) -> Self {
         Pipeline {
             rasterizer: Rasterizer::new(tile_size, width, height),
+            shader: shader,
         }
     }
     /// Clear rasterizer and others values before processing the scene again.
-    pub fn clear(&mut self) {
-        self.rasterizer.clear();
+    pub fn clear(&mut self, color: &[u8]) {
+        self.rasterizer.clear_with_color(color);
     }
     /// Processes the data contained within the scene and prepares it for rendering.
     ///
@@ -66,7 +71,11 @@ impl Pipeline {
                     geometry.lin_transform(&perspective_transform);
                     // Clip trianlges to view frustum.
                     geometry.clip_geometry();
+                    // Set important values for rasterization.
                     geometry.set_clip_w_inv();
+                    // let clip_to_world = (perspective_transform*camera_inv_transform).inverse();
+                    let clip_to_world = (perspective_transform*camera_inv_transform).inverse();
+                    geometry.set_triangle_world_normals(clip_to_world);
                     // Convert to ndc space.
                     geometry.perspective_divide();
                     // Convert to screen space.
@@ -81,38 +90,12 @@ impl Pipeline {
                     } else {
                         None
                     };
-                    self.rasterizer.rasterize_threaded(&geometry, screen, texture);
+                    self.rasterizer.rasterize_threaded(&geometry, screen, texture, &self.shader, scene.lights());
                 }
             }
             crate::scene::camera::Projection::Orthographic { .. } => {
                 todo!("Implement orthographic projection.");
             }
-        }
-    }
-}
-/// Containts the necessary data to handle a triangle from geometry binned in a tile.
-#[derive(Clone, Copy)]
-struct BinnedTriangle {
-    /// Start index of the triangle within the [`geometry::Geometry`]'s triangles vector.
-    pub triangle_start: usize,
-    /// Minimum x value of the triangle's aabs relative to the tile.
-    pub min_x: usize,
-    /// Minimum y value of the triangle's aabs relative to the tile.
-    pub min_y: usize,
-    /// Maximum x value of the triangle's aabs relative to the tile.
-    pub max_x: usize,
-    /// Maximum y value of the triangle's aabs relative to the tile.
-    pub max_y: usize,
-}
-impl BinnedTriangle {
-    /// Create default BinnedTriangle with 0 for every value.
-    pub fn new() -> Self {
-        BinnedTriangle {
-            triangle_start: 0,
-            min_x: 0,
-            min_y: 0,
-            max_x: 0,
-            max_y: 0,
         }
     }
 }

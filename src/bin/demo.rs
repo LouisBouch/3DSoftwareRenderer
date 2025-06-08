@@ -1,4 +1,4 @@
-use glam::{DQuat, DVec3};
+use glam::{DQuat, DVec3, U8Vec3};
 // use glam::vec2;
 // use ndarray;
 // let a: ndarray::Array2<i32> = ndarray::Array2::from_shape_vec((2, 3), b).unwrap();
@@ -6,10 +6,12 @@ use glam::{DQuat, DVec3};
 // let v = vec2(1.0, 1.0);
 // println!("{}, {}", v.x, a[(1, 2)]);
 use soft_rend::{
-    app::App,
+    app::SoftwareRenderer,
+    pipeline::shader::{Shader, ShaderType},
     resources::loaders::{DefaultMesh, DefaultTexture, MeshLoader, TextureLoader},
     scene::{
         camera::{Camera, CameraStyle},
+        light::{Light, LightType},
         Scene,
     },
 };
@@ -63,17 +65,31 @@ fn main() -> Result<(), winit::error::EventLoopError> {
     // Create a wall of cubes.
     let side = 7;
     let moves = 110.0;
-    for y in -side/2..=side/2 {
-        for x in -side/2..=side/2 {
+    for y in -side / 2..=side / 2 {
+        for x in -side / 2..=side / 2 {
             let mut c = cube1.clone();
             c.translate(DVec3::new(moves * x as f64, moves * y as f64, 0.0));
             scene.add_mesh(c);
         }
     }
 
+    // Add lights.
+    let light = Light::new(
+        1.5,
+        U8Vec3::new(255, 255, 255),
+        LightType::AtInfinity(DVec3::new(0.2, -0.2, -1.0)),
+    );
+    scene.add_light(light);
+    // Decide on the type of shader.
+    let shader_type = ShaderType::Flat;
+    let shader = match shader_type {
+        ShaderType::Phong => todo!("Implement Phong shader"),
+        ShaderType::Gouraud => todo!("Implement Gouraud shader"),
+        ShaderType::Flat => Shader::new(0.15, ShaderType::Flat),
+    };
     // Create and start the app.
-    let mut app = App::new(width, height, scene);
-    app.set_max_it(30);
-    event_loop.run_app(&mut app)?;
+    let mut software_renderer = SoftwareRenderer::new(width, height, scene, shader);
+    // app.set_max_it(30);
+    event_loop.run_app(&mut software_renderer)?;
     Ok(())
 }

@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use std::u32;
 
 use crate::action::Action;
+use crate::pipeline::shader::{Shader, ShaderType};
 use crate::pipeline::Pipeline;
 use crate::{
     graphics::{self, screen::Screen, window::Window},
@@ -17,7 +18,7 @@ use winit::event_loop::ControlFlow;
 use winit::{event::WindowEvent, event_loop};
 
 /// Contains the window, screen that is within the window and the input manager.
-pub struct App {
+pub struct SoftwareRenderer {
     /// Contains the winit window and its dimension.
     window: graphics::window::Window,
     /// Contains the screen instance which will be used to draw on the window.
@@ -43,7 +44,7 @@ pub struct App {
     /// The number of frames that were rendered since the last fps count.
     frame_count: u32,
 }
-impl App {
+impl SoftwareRenderer {
     /// Creates an app.
     ///
     /// Prepares the necessary fields before running the event loop.
@@ -53,21 +54,22 @@ impl App {
     /// * `width` - Width of the window.
     /// * `height` - Height of the window.
     /// * `scene` - The scene that will be rendered.
+    /// * ``
     ///
     /// # Returns
     ///
     /// The instantiated App.
-    pub fn new(width: usize, height: usize, scene: Scene) -> Self {
+    pub fn new(width: usize, height: usize, scene: Scene, shader: Shader) -> Self {
         let window = Window::new(width, height);
         let input_state = inputs::InputHandler::new();
         let screen = Screen::new(width, height);
         let fps = 144;
-        let pipeline = Pipeline::new(64, width, height);
+        let pipeline = Pipeline::new(64, width, height, shader);
         let last_frame_time = Instant::now();
         let last_fps_count = Instant::now();
 
         let frame_count = 0;
-        App {
+        SoftwareRenderer {
             window,
             screen,
             input_state,
@@ -96,7 +98,8 @@ impl App {
     /// The instantiated App.
     pub fn with_default_scene(width: usize, height: usize) -> Self {
         let scene = Scene::new();
-        Self::new(width, height, scene)
+        let shader = Shader::new(0.15, ShaderType::Flat);
+        Self::new(width, height, scene, shader)
     }
     /// Acts on actions.
     ///
@@ -194,7 +197,7 @@ impl App {
     }
 }
 // Getters/Setters
-impl App {
+impl SoftwareRenderer {
     /// Sets the frames per second of the software renderer.
     pub fn set_fps(&mut self, fps: u32) {
         self.fps = fps;
@@ -209,7 +212,7 @@ impl App {
     }
 }
 
-impl ApplicationHandler for App {
+impl ApplicationHandler for SoftwareRenderer {
     fn resumed(&mut self, event_loop: &event_loop::ActiveEventLoop) {
         // Initialize the winit window inside the app's window.
         if let Err(e) = self.window.initialize_window(event_loop) {
@@ -306,7 +309,7 @@ impl ApplicationHandler for App {
             self.next_frame_time = Instant::now() + Duration::from_secs_f64(1.0 / self.fps as f64);
 
             // Reset screen.
-            self.pipeline.clear();
+            self.pipeline.clear(self.screen.bg_color());
 
             // Compute frame.
             self.next_frame();

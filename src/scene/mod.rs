@@ -1,6 +1,7 @@
 //! Contains everything needed to render the environment.
 
 use camera::Camera;
+use light::Light;
 
 use crate::resources::{mesh::Mesh, texture::TextureCatalog};
 
@@ -12,6 +13,8 @@ pub struct Scene {
     texture_catalog: TextureCatalog,
     /// A list of meshes inside the scene.
     meshes: Vec<Mesh>,
+    /// A list of lights inside the scene.
+    lights: Vec<Light>,
 }
 impl Scene {
     /// Create new scene with default camera placement.
@@ -21,6 +24,7 @@ impl Scene {
             camera,
             texture_catalog: TextureCatalog::new(),
             meshes: Vec::new(),
+            lights: Vec::new(),
         }
     }
     /// Create new scene with user defined camera.
@@ -29,11 +33,16 @@ impl Scene {
             camera,
             texture_catalog: TextureCatalog::new(),
             meshes: Vec::new(),
+            lights: Vec::new(),
         }
     }
     /// Adds a mesh to the scene.
     pub fn add_mesh(&mut self, mesh: Mesh) {
         self.meshes.push(mesh);
+    }
+    /// Adds a light to the scene.
+    pub fn add_light(&mut self, light: Light) {
+        self.lights.push(light);
     }
 }
 // Getters and setters.
@@ -62,6 +71,14 @@ impl Scene {
     pub fn meshes(&self) -> &[Mesh] {
         &self.meshes
     }
+    /// Mutable reference for the light vector.
+    pub fn lights_mut(&mut self) -> &mut Vec<Light> {
+        &mut self.lights
+    }
+    /// Reference for the light vector.
+    pub fn lights(&self) -> &[Light] {
+        &self.lights
+    }
 }
 pub mod camera;
-mod light;
+pub mod light;

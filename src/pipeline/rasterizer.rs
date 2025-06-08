@@ -1,12 +1,17 @@
 //! Contains everything that will be needed to rasterize an image.
 use core::f64;
 
-use glam::{DVec2, Vec3Swizzles, Vec4Swizzles};
+use glam::{DVec2, DVec3, Vec3Swizzles, Vec4Swizzles};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
-use crate::{algorithm, graphics::screen::Screen, resources::texture::Texture};
+use crate::{
+    algorithm, graphics::screen::Screen, resources::texture::Texture, scene::light::Light,
+};
 
-use super::{geometry::Geometry, BinnedTriangle};
+use super::{
+    geometry::Geometry,
+    shader,
+};
 
 /// Holds the necessary values for rasterizing.
 pub struct Rasterizer {
@@ -39,12 +44,23 @@ impl Rasterizer {
         ];
         Rasterizer { tile_size, tiles }
     }
-    /// Clears the tiles of the rasterizer.
+    /// Clears the tiles of the rasterizer to a transparent black.
     /// TODO: Add dirty tile system and only fill these up.
-    pub fn clear(&mut self) {
+    pub fn _clear(&mut self) {
         for tile in self.tiles.iter_mut() {
             tile.depth_buf.fill(f64::INFINITY);
-            // tile.frame_buf.fill(0);
+            tile.frame_buf.fill(0);
+        }
+    }
+    /// Clears the tiles of the rasterizer to a certain color.
+    /// TODO: Add dirty tile system and only fill these up.
+    pub fn clear_with_color(&mut self, color: &[u8]) {
+        let color_alpha = [color[0], color[1], color[2], 255];
+        for tile in self.tiles.iter_mut() {
+            tile.depth_buf.fill(f64::INFINITY);
+            for value in tile.frame_buf.chunks_exact_mut(4) {
+                value.copy_from_slice(&color_alpha);
+            }
         }
     }
     /// Raterizes the geometry on the screen buffer while making use of multithreading.
@@ -54,16 +70,19 @@ impl Rasterizer {
     /// TILES GO LEFT TO RIGHT, TOP TO BOTTOM (Row major).
     pub fn rasterize_threaded(
         &mut self,
-        geometry: &Geometry,
+        geometry_screen: &Geometry,
         screen: &mut Screen,
         texture: Option<&Texture>,
+        shader: &shader::Shader,
+        lights: &[Light],
     ) {
         let tile_size = self.tile_size();
         // Get useful values for rasterizing.
-        let vertices = geometry.vertices();
-        let uvs = geometry.uvs();
-        let w_invs = geometry.clip_w_inv();
-        let triangles = geometry.triangles();
+        let vertices_screen = geometry_screen.vertices();
+        let uvs = geometry_screen.uvs();
+        let w_invs = geometry_screen.clip_w_inv();
+        let triangles = geometry_screen.triangles();
+        let triangle_world_normals = geometry_screen.triangle_normals();
         let (width, height) = (screen.width(), screen.height());
         // Get number of channels the texture format requries (0 if no texture).
         let nb_channels = if let Some(t) = texture {
@@ -91,7 +110,11 @@ impl Rasterizer {
                 triangles[triangle_index_start + 2],
             );
             // Triangle vertex position in space.
-            let (a, b, c) = (vertices[ai].xyz(), vertices[bi].xyz(), vertices[ci].xyz());
+            let (a, b, c) = (
+                vertices_screen[ai].xyz(),
+                vertices_screen[bi].xyz(),
+                vertices_screen[ci].xyz(),
+            );
 
             // Get bounding box of triangle.
             // Both max and min values are included
@@ -122,6 +145,7 @@ impl Rasterizer {
                     binned_triangle.max_x = (max_x - tile_x * tile_size).min(tile_size - 1);
                     binned_triangle.max_y = (max_y - tile_y * tile_size).min(tile_size - 1);
                     binned_triangle.triangle_start = triangle_index_start;
+                    binned_triangle.world_normal = triangle_world_normals[triangle_index_start/3];
                     // Push it in the corresponding bin.
                     binned_triangles[tile_x + tile_y * nb_tiles_x].push(binned_triangle);
                 }
@@ -145,6 +169,8 @@ impl Rasterizer {
                 for binned_triangle in binned_triangles_tile.iter() {
                     // Get the first vertex position of the triangle.
                     let triangle_index_start = binned_triangle.triangle_start;
+                    // The triangle normal.
+                    let triangle_normal = binned_triangle.world_normal;
 
                     // Triangle vertex indices.
                     let (ai, bi, ci) = (
@@ -152,8 +178,12 @@ impl Rasterizer {
                         triangles[triangle_index_start + 1],
                         triangles[triangle_index_start + 2],
                     );
-                    // Triangle's vertex positions in space.
-                    let (a, b, c) = (vertices[ai].xyz(), vertices[bi].xyz(), vertices[ci].xyz());
+                    // Triangle's vertex positions in screen and world space.
+                    let (a, b, c) = (
+                        vertices_screen[ai].xyz(),
+                        vertices_screen[bi].xyz(),
+                        vertices_screen[ci].xyz(),
+                    );
                     // UV coordinates of each vertex.
                     let (uv_a, uv_b, uv_c) = (uvs[ai], uvs[bi], uvs[ci]);
                     // Inverted w (1/w) from the homogeneous coordinates in clip space.
@@ -222,7 +252,23 @@ impl Rasterizer {
                                 let pixel_channel_index = 4 * pixel_index;
                                 match texture {
                                     Some(texture) => {
-                                        let color = texture.from_uv(uv[0], uv[1]);
+                                        let shading_value = match shader.shader_type {
+                                            shader::ShaderType::Flat => {
+                                                shader.shade(triangle_normal, lights)
+                                            }
+                                            shader::ShaderType::Phong => {
+                                                todo!("Implement Phong shading")
+                                            }
+                                            shader::ShaderType::Gouraud => {
+                                                todo!("Implement Gouraud shading.")
+                                            }
+                                        };
+                                        let color: Vec<u8> = texture
+                                            .from_uv(uv[0], uv[1])
+                                            .to_vec()
+                                            .iter_mut()
+                                            .map(|&mut a| (a as f64 * shading_value) as u8)
+                                            .collect();
                                         // SAFETY: frame is guaranteed to have at least 4 valid indices
                                         // after pixel_channel_index, and color has at most 4. Thus,
                                         // when copying, nothing will go out of bounds.
@@ -327,5 +373,34 @@ pub struct Tile {
 impl Tile {
     pub fn get_buffers(&mut self) -> (&mut [u8], &mut [f64]) {
         (&mut self.frame_buf, &mut self.depth_buf)
+    }
+}
+/// Containts the necessary data to handle a triangle from geometry binned in a tile.
+#[derive(Clone, Copy)]
+struct BinnedTriangle {
+    /// Start index of the triangle within the [`geometry::Geometry`]'s triangles vector.
+    pub triangle_start: usize,
+    /// Minimum x value of the triangle's aabs relative to the tile.
+    pub min_x: usize,
+    /// Minimum y value of the triangle's aabs relative to the tile.
+    pub min_y: usize,
+    /// Maximum x value of the triangle's aabs relative to the tile.
+    pub max_x: usize,
+    /// Maximum y value of the triangle's aabs relative to the tile.
+    pub max_y: usize,
+    /// The triangle's normal when it was in world spce.
+    pub world_normal: DVec3,
+}
+impl BinnedTriangle {
+    /// Create default BinnedTriangle with 0 for every value.
+    pub fn new() -> Self {
+        BinnedTriangle {
+            triangle_start: 0,
+            min_x: 0,
+            min_y: 0,
+            max_x: 0,
+            max_y: 0,
+            world_normal: DVec3::default(),
+        }
     }
 }
