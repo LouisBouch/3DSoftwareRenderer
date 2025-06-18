@@ -1,7 +1,7 @@
 # Software renderer
 
-This crate allows for the rendering of triangular meshes through a software renderer. It uses fps-like controls to allow users to move within the environment, see [`inputs`] for more information regarding movement.  
-To see how to create an environment  see the [demo.rs](src/bin/demo.rs) file.
+This crate allows for the rendering of triangular meshes through a software renderer. It uses fps-like controls to allow users to move within the environment, see [`inputs`] (or [input.rs](https://github.com/LouisBouch/3DSoftwareRenderer/blob/main/src/inputs.rs) on github) for more information regarding movement.  
+To see how to create an environment  see the [demo.rs](https://github.com/LouisBouch/3DSoftwareRenderer/blob/main/src/bin/demo.rs) file.
 
 
 ## Dependencies
