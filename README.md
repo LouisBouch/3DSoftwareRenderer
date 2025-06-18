@@ -4,3 +4,9 @@ This crate allows for the rendering of triangular meshes through a software rend
 
 **Documentation**: To build and view documentation locally, run: ```cargo doc --no-deps --document-private-items```
 
+
+## Demo
+Quick demo of the software renderer.
+[![YouTube](https://i.ytimg.com/vi/0UkRbKPa0mg/maxresdefault.jpg?sqp=-oaymwEmCIAKENAF8quKqQMa8AEB-AHYCYAC0AWKAgwIABABGGQgZChkMA8=&rs=AOn4CLBrGmMxIkpknoLA_Qrx2ZkIq5Krkg)](https://youtu.be/3NWAUdYBOUw)
+
+

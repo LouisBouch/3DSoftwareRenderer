@@ -17,7 +17,7 @@ use soft_rend::{
 };
 use winit::event_loop::EventLoop;
 fn main() -> Result<(), winit::error::EventLoopError> {
-    let (width, height) = (800, 600);
+    let (width, height) = (1600, 900);
     // Create the event loop that will be used to manage window events.
     let event_loop = EventLoop::new().unwrap();
 
@@ -63,7 +63,7 @@ fn main() -> Result<(), winit::error::EventLoopError> {
         });
     cube1.set_texture(Some(checkered_id));
     // Create a wall of cubes.
-    let side = 7;
+    let side = 5;
     let moves = 110.0;
     for y in -side / 2..=side / 2 {
         for x in -side / 2..=side / 2 {
