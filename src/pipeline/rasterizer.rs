@@ -15,7 +15,7 @@ use super::{
 
 /// Holds the necessary values for rasterizing.
 pub struct Rasterizer {
-    /// Divides the screen into tiles of size [`tile_size`].
+    /// Divides the screen into tiles of size `tile_size`.
     tile_size: usize,
     /// The depth and pixel buffer for each tile on the screen.
     tiles: Vec<Tile>,
@@ -378,7 +378,7 @@ impl Tile {
 /// Containts the necessary data to handle a triangle from geometry binned in a tile.
 #[derive(Clone, Copy)]
 struct BinnedTriangle {
-    /// Start index of the triangle within the [`geometry::Geometry`]'s triangles vector.
+    /// Start index of the triangle within the [`Geometry`]'s triangles vector.
     pub triangle_start: usize,
     /// Minimum x value of the triangle's aabs relative to the tile.
     pub min_x: usize,
