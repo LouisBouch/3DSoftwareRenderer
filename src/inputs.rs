@@ -1,4 +1,7 @@
 //! Handles the input from the user.
+//!
+//! Use WASD to move around the environment and the mouse to look around. TAB is used to
+//! capture/release the mouse within the window.
 use crate::action::Action;
 use glam::DVec2;
 use std::collections::HashMap;
